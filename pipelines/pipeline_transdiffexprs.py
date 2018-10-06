@@ -24,6 +24,10 @@ The pipeline performs the following
 
    * Perform differential expression analysis using DeSeq2
    
+Installation
+============
+
+If you are on a mac then you will need to also install the R dependancy wasabi
    
 Usage
 =====
@@ -132,7 +136,8 @@ import cgatcore.iotools as iotools
 import cgatcore.experiment as E
 from cgatcore import pipeline as P
 
-import module_transdiffexprs as tdexp
+import tasks.mapping as mapping
+import tasks.rnaseq as rnaseq
 
 
 # load options from the config file
@@ -141,6 +146,7 @@ P.get_parameters(
      "../pipeline.yml",
      "pipeline.yml"])
 
+PARAMS = P.PARAMS
 
 @mkdir('geneset.dir')
 @transform(PARAMS['geneset'],
@@ -168,7 +174,7 @@ def buildReferenceTranscriptome(infile, outfile):
         os.path.join(PARAMS["genome_dir"], PARAMS["genome"] + ".fa"))
 
     statement = '''
-    zcat %(infile)s |
+    zcat < %(infile)s |
     awk '$3=="exon"'|
     cgat gff2fasta
     --is-gtf --genome-file=%(genome_file)s --fold-at=60 -v 0
@@ -240,8 +246,193 @@ def buildSalmonIndex(infile, outfile):
     P.run(statement)
 
 
+@originate("transcript2geneMap.tsv")
+def getTranscript2GeneMap(outfile):
+    ''' Extract a 1:1 map of transcript_id to gene_id from the geneset '''
+
+    iterator = GTF.iterator(iotools.open_file(PARAMS['geneset']))
+    transcript2gene_dict = {}
+
+    for entry in iterator:
+
+        # Check the same transcript_id is not mapped to multiple gene_ids!
+        if entry.transcript_id in transcript2gene_dict:
+            if not entry.gene_id == transcript2gene_dict[entry.transcript_id]:
+                raise ValueError('''multipe gene_ids associated with
+                the same transcript_id %s %s''' % (
+                    entry.gene_id,
+                    transcript2gene_dict[entry.transcript_id]))
+        else:
+            transcript2gene_dict[entry.transcript_id] = entry.gene_id
+
+    with iotools.open_file(outfile, "w") as outf:
+        outf.write("transcript_id\tgene_id\n")
+        for key, value in sorted(transcript2gene_dict.items()):
+            outf.write("%s\t%s\n" % (key, value))
+
+DATADIR = "."
+
+SEQUENCESUFFIXES = ("*.fastq.1.gz",
+                    "*.fastq.gz",
+                    "*.sra")
+SEQUENCEFILES = tuple([os.path.join(DATADIR, suffix_name)
+                       for suffix_name in SEQUENCESUFFIXES])
+
+# enable multiple fastqs from the same sample to be analysed together
+if "merge_pattern_input" in PARAMS and PARAMS["merge_pattern_input"]:
+    SEQUENCEFILES_REGEX = regex(
+        r"%s/%s.(fastq.1.gz|fastq.gz|sra)" % (
+            DATADIR, PARAMS["merge_pattern_input"].strip()))
+
+    # the last expression counts number of groups in pattern_input
+    SEQUENCEFILES_KALLISTO_OUTPUT = [
+        r"kallisto.dir/%s/transcripts.tsv.gz" % (
+            PARAMS["merge_pattern_output"].strip()),
+        r"kallisto.dir/%s/genes.tsv.gz" % (
+            PARAMS["merge_pattern_output"].strip())]
+
+    SEQUENCEFILES_SALMON_OUTPUT = [
+        r"salmon.dir/%s/transcripts.tsv.gz" % (
+            PARAMS["merge_pattern_output"].strip()),
+        r"salmon.dir/%s/genes.tsv.gz" % (
+            PARAMS["merge_pattern_output"].strip())]
+
+else:
+    SEQUENCEFILES_REGEX = regex(
+        "(\S+).(fastq.1.gz|fastq.gz|sra)")
+
+    SEQUENCEFILES_KALLISTO_OUTPUT = [
+        r"kallisto.dir/\1/transcripts.tsv.gz",
+        r"kallisto.dir/\1/genes.tsv.gz"]
+
+    SEQUENCEFILES_SALMON_OUTPUT = [
+        r"salmon.dir/\1/transcripts.tsv.gz",
+        r"salmon.dir/\1/genes.tsv.gz"]
 
 
+@follows(mkdir("kallisto.dir"))
+@collate(SEQUENCEFILES,
+         SEQUENCEFILES_REGEX,
+         add_inputs(buildKallistoIndex, getTranscript2GeneMap),
+         SEQUENCEFILES_KALLISTO_OUTPUT)
+def runKallisto(infiles, outfiles):
+    '''
+    Computes read counts across transcripts and genes based on a fastq
+    file and an indexed transcriptome using Kallisto.
+    Runs the kallisto "quant" function across transcripts with the specified
+    options.  Read counts across genes are counted as the total in all
+    transcripts of that gene (based on the getTranscript2GeneMap table)
+    Parameters
+    ----------
+    infiles: list
+        list with three components
+        0 - list of strings - paths to fastq files to merge then quantify
+        across using Kallisto
+        1 - string - path to Kallisto index file
+        2 - string - path totable mapping transcripts to genes
+    kallisto_threads: int
+       :term: `PARAMS` the number of threads for Kallisto
+    kallisto_memory: str
+       :term: `PARAMS` the job memory for Kallisto
+    kallisto_options: str
+       :term: `PARAMS` string to append to the Kallisto quant command to
+       provide specific
+       options, see https://pachterlab.github.io/kallisto/manual
+    kallisto_bootstrap: int
+       :term: `PARAMS` number of bootstrap samples to run.
+       Note, you need to bootstrap for differential expression with sleuth
+       if there are no technical replicates. If you only need point estimates,
+       set to 1.  Note that bootstrap must be set to at least 1
+    kallisto_fragment_length: int
+       :term: `PARAMS` Fragment length for Kallisto, required for single end
+       reads only
+    kallisto_fragment_sd: int
+       :term: `PARAMS` Fragment length standard deviation for Kallisto,
+       required for single end reads only.
+    outfiles: list
+       paths to output files for transcripts and genes
+    '''
+
+    # TS more elegant way to parse infiles and index?
+    fastqfile = [x[0] for x in infiles]
+    index = infiles[0][1]
+    transcript2geneMap = infiles[0][2]
+
+    transcript_outfile, gene_outfile = outfiles
+    Quantifier = rnaseq.KallistoQuantifier(
+        infile=fastqfile,
+        transcript_outfile=transcript_outfile,
+        gene_outfile=gene_outfile,
+        annotations=index,
+        job_threads=PARAMS["kallisto_threads"],
+        job_memory=PARAMS["kallisto_memory"],
+        options=PARAMS["kallisto_options"],
+        bootstrap=PARAMS["kallisto_bootstrap"],
+        fragment_length=PARAMS["kallisto_fragment_length"],
+        fragment_sd=PARAMS["kallisto_fragment_sd"],
+        transcript2geneMap=transcript2geneMap)
+
+    Quantifier.run_all()
+
+
+@follows(mkdir("salmon.dir"))
+@collate(SEQUENCEFILES,
+         SEQUENCEFILES_REGEX,
+         add_inputs(buildSalmonIndex, getTranscript2GeneMap),
+         SEQUENCEFILES_SALMON_OUTPUT)
+def runSalmon(infiles, outfiles):
+    '''
+    Computes read counts across transcripts and genes based on a fastq
+    file and an indexed transcriptome using Salmon.
+    Runs the salmon "quant" function across transcripts with the specified
+    options.  Read counts across genes are counted as the total in all
+    transcripts of that gene (based on the getTranscript2GeneMap table)
+    Parameters
+    ----------
+    infiles: list
+        list with three components
+        0 - list of strings - paths to fastq files to merge then quantify
+        across using sailfish
+        1 - string - path to sailfish index file
+        2 - string - path to table mapping transcripts to genes
+    salmon_threads: int
+       :term: `PARAMS` the number of threads for salmon
+    salmon_memory: str
+       :term: `PARAMS` the job memory for salmon
+    salmon_options: str
+       :term: `PARAMS` string to append to the salmon quant command to
+       provide specific
+       options, see http://sailfish.readthedocs.io/en/master/salmon.html
+    salmon_bootstrap: int
+       :term: `PARAMS` number of bootstrap samples to run.
+       Note, you need to bootstrap for differential expression with sleuth
+       if there are no technical replicates. If you only need point estimates,
+       set to 1.
+    salmon_libtype: str
+       :term: `PARAMS` salmon library type
+       as for sailfish - use
+       http://sailfish.readthedocs.io/en/master/library_type.html#fraglibtype
+    outfiles: list
+       paths to output files for transcripts and genes
+    '''
+    fastqfile = [x[0] for x in infiles]
+    index = infiles[0][1]
+    transcript2geneMap = infiles[0][2]
+
+    transcript_outfile, gene_outfile = outfiles
+    Quantifier = rnaseq.SalmonQuantifier(
+        infile=fastqfile,
+        transcript_outfile=transcript_outfile,
+        gene_outfile=gene_outfile,
+        annotations=index,
+        job_threads=PARAMS["salmon_threads"],
+        job_memory=PARAMS["salmon_memory"],
+        options=PARAMS["salmon_options"],
+        bootstrap=PARAMS["salmon_bootstrap"],
+        libtype=PARAMS['salmon_libtype'],
+        transcript2geneMap=transcript2geneMap)
+
+    Quantifier.run_all()
 
 
 def full():
