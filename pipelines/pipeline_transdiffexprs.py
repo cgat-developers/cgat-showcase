@@ -135,5 +135,24 @@ from cgatcore import pipeline as P
 import module_transdiffexprs as tdexp
 
 
+# load options from the config file
+P.get_parameters(
+    ["%s/pipeline.yml" % os.path.splitext(__file__)[0],
+     "../pipeline.yml",
+     "pipeline.yml"])
+
+
+def full():
+    ''' dummy task for full ruffus tasks'''
+    pass
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+    P.main(argv)
+
+if __name__ == "__main__":
+    sys.exit(P.main(sys.argv))
+
 
    
