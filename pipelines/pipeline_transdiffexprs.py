@@ -358,6 +358,8 @@ def runKallisto(infiles, outfiles):
     index = infiles[0][1]
     transcript2geneMap = infiles[0][2]
 
+# should replace this with commandline statement to make this simpler to understand, same for salmon
+
     transcript_outfile, gene_outfile = outfiles
     Quantifier = rnaseq.KallistoQuantifier(
         infile=fastqfile,
