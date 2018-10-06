@@ -142,6 +142,108 @@ P.get_parameters(
      "pipeline.yml"])
 
 
+@mkdir('geneset.dir')
+@transform(PARAMS['geneset'],
+           regex("(\S+).gtf.gz"),
+           r"geneset.dir/\1.fa")
+def buildReferenceTranscriptome(infile, outfile):
+    '''
+    Builds a reference transcriptome from the provided GTF geneset - generates
+    a fasta file containing the sequence of each feature labelled as
+    "exon" in the GTF.
+    --fold-at specifies the line length in the output fasta file
+    Parameters
+    ----------
+    infile: str
+        path to the GTF file containing transcript and gene level annotations
+    genome_dir: str
+        :term: `PARAMS` the directory of the reference genome
+    genome: str
+        :term: `PARAMS` the filename of the reference genome (without .fa)
+    outfile: str
+        path to output file
+    '''
+
+    genome_file = os.path.abspath(
+        os.path.join(PARAMS["genome_dir"], PARAMS["genome"] + ".fa"))
+
+    statement = '''
+    zcat %(infile)s |
+    awk '$3=="exon"'|
+    cgat gff2fasta
+    --is-gtf --genome-file=%(genome_file)s --fold-at=60 -v 0
+    --log=%(outfile)s.log > %(outfile)s;
+    samtools faidx %(outfile)s
+    '''
+
+    P.run(statement)
+
+
+@transform(buildReferenceTranscriptome,
+           suffix(".fa"),
+           ".kallisto.index")
+def buildKallistoIndex(infile, outfile):
+    '''
+    Builds a kallisto index for the reference transcriptome
+    Parameters
+    ----------
+    infile: str
+       path to reference transcriptome - fasta file containing transcript
+       sequences
+    kallisto_kmer: int
+       :term: `PARAMS` kmer size for Kallisto.  Default is 31.
+       Kallisto will ignores transcripts shorter than this.
+    outfile: str
+       path to output file
+    '''
+
+    job_memory = "12G"
+
+    statement = '''
+    kallisto index -i %(outfile)s -k %(kallisto_kmer)s %(infile)s
+    '''
+
+    P.run(statement)
+
+
+@transform(buildReferenceTranscriptome,
+           suffix(".fa"),
+           ".salmon.index")
+def buildSalmonIndex(infile, outfile):
+    '''
+    Builds a salmon index for the reference transriptome
+    Parameters
+    ----------
+    infile: str
+       path to reference transcriptome - fasta file containing transcript
+       sequences
+    salmon_kmer: int
+       :term: `PARAMS` kmer size for sailfish.  Default is 31.
+       Salmon will ignores transcripts shorter than this.
+    salmon_index_options: str
+       :term: `PARAMS` string to append to the salmon index command to
+       provide specific options e.g. --force --threads N
+    outfile: str
+       path to output file
+    '''
+
+    job_memory = "6G"
+    # need to remove the index directory (if it exists) as ruffus uses
+    # the directory timestamp which wont change even when re-creating
+    # the index files
+    statement = '''
+    rm -rf %(outfile)s;
+    salmon index %(salmon_index_options)s -t %(infile)s -i %(outfile)s
+    -k %(salmon_kmer)s
+    '''
+
+    P.run(statement)
+
+
+
+
+
+
 def full():
     ''' dummy task for full ruffus tasks'''
     pass
