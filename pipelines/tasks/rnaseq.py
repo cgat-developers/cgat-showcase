@@ -36,6 +36,7 @@ Reference
 import cgatcore.experiment as E
 import cgatcore.csvutils as CSV
 import cgat.Sra as Sra
+import cgat.Fastq as Fastq
 
 import collections
 import glob
@@ -62,13 +63,698 @@ import tasks.mapping as mapping
 
 from cgatcore.pipeline import cluster_runnable
 
-# AH: commented as I thought we wanted to avoid to
-# enable this automatically due to unwanted side
-# effects in other modules.
-# import rpy2.robjects.numpy2ri
-# rpy2.robjects.numpy2ri.activate()
 
 
+class SequenceCollectionProcessor(object):
+    """base class for processors of sequence collections.
+
+    Processors of sequence collections are mappers, trimmers, etc.
+
+    The aim of these processors is to build a sequence
+    of command line statements that can be send to a single node
+    on a cluster to process the input data.
+
+    Attributes
+    ==========
+    compress : bool
+        If True, compress temporary fastq files with gzip
+    convert : bool
+        If True, convert quality scores to Sanger quality scores.
+    preserve_colourspace : bool
+        If True, preserve colour space files. By default they are
+        converted to fastq.
+    tmpdir_fastq : string
+        Directory with the locations of temporary :term:`fastq`
+        formatted files. This directory can be used as a general
+        temporary directory by a mapper.
+    """
+
+    # compress temporary fastq files with gzip
+    compress = False
+
+    # convert to sanger quality scores
+    convert = False
+
+    # set to True if you want to preserve colour space files.
+    # By default, they are converted to fastq.
+    preserve_colourspace = False
+
+    # Temporary directory where temporary fastq files will
+    # be located.
+    tmpdir_fastq = None
+
+    keep_sra = True
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def quoteFile(self, filename):
+        '''return a quoted file for in-situ uncompression.
+
+        The quoting adds uncompression for compressed files for
+        programs that expect uncompressed files.
+
+        .. note::
+            This will only work if the downstream programs reads
+            the file only once.
+
+        '''
+        if filename.endswith(".gz") and not self.compress:
+            return "<( gunzip < %s )" % filename
+        else:
+            return filename
+
+    def preprocess(self, infiles, outfile):
+        '''build a preprocessing statement
+
+        Build a command line statement that extracts/converts various
+        input formats to :term:`fastq` formatted files.
+
+        Mapping qualities are changed to solexa format.
+
+        Returns
+        -------
+        statement : string
+            The command line statement for pre-processing.
+        files : list
+            List of :term:`fastq` formatted files that will
+            be created by `statement`.
+        '''
+        # explicitly assign qual_format to use in string formatting
+        try:
+            assert self.qual_format
+            qual_format = self.qual_format
+        except AttributeError:
+            qual_format = 'illumina-1.8'
+
+        assert len(infiles) > 0, "no input files for processing"
+
+        tmpdir_fastq = P.get_temp_dir(shared=True)
+        self.tmpdir_fastq = tmpdir_fastq
+        # create temporary directory again for nodes
+        statement = ["mkdir -p %s" % tmpdir_fastq]
+        fastqfiles = []
+
+        # get track by extension of outfile
+        track = os.path.splitext(os.path.basename(outfile))[0]
+
+        if self.compress:
+            compress_cmd = "| gzip"
+            extension = ".gz"
+        else:
+            compress_cmd = ""
+            extension = ""
+
+        for infile in infiles:
+
+            if infile.endswith(".export.txt.gz"):
+                # single end illumina export
+                statement.append("""gunzip < %(infile)s
+                | awk '$11 != "QC" || $10 ~ /(\d+):(\d+):(\d+)/ \
+                {if ($1 != "")
+                {readname=sprintf("%%%%s_%%%%s:%%%%s:%%%%s:%%%%s:%%%%s",
+                $1, $2, $3, $4, $5, $6);}
+                else {readname=sprintf("%%%%s:%%%%s:%%%%s:%%%%s:%%%%s",
+                $1, $3, $4, $5, $6);}
+                printf("@%%%%s\\n%%%%s\\n+\\n%%%%s\\n",readname,$9,$10);}'
+                %(compress_cmd)s
+                > %(tmpdir_fastq)s/%(track)s.fastq%(extension)s""" % locals())
+                fastqfiles.append(
+                    ("%s/%s.fastq%s" % (tmpdir_fastq, track, extension),))
+            elif infile.endswith(".fa.gz"):
+                statement.append(
+                    '''gunzip < %(infile)s %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.fa''' % locals())
+                fastqfiles.append(("%s/%s.fa" % (tmpdir_fastq, track),))
+                self.datatype = "fasta"
+
+            elif infile.endswith(".remote"):
+                files = []
+                for line in iotools.open_file(infile):
+                    repo, acc = line.strip().split("\t")[:2]
+                    if repo == "SRA":
+                        statement.append(Sra.prefetch(acc))
+                        f, format, _ = Sra.peek(acc)
+                        statement.append(Sra.extract(acc, tmpdir_fastq))
+
+                        extracted_files = ["%s/%s" % (
+                            tmpdir_fastq, os.path.basename(x))
+                            for x in sorted(f)]
+                        if not self.keep_sra:
+                            statement.append(Sra.clean_cache(acc))
+                        files.extend(extracted_files)
+
+                    elif repo == "ENA":
+                        filenames, dl_paths = Sra.fetch_ENA_files(acc)
+                        for f in dl_paths:
+                            statement.append(Sra.fetch_ENA(f, tmpdir_fastq))
+                        files.extend([os.path.join(tmpdir_fastq, x) for x
+                                      in filenames])
+
+                    elif repo == "TCGA":
+                        tar_name = line.strip().split("\t")[2]
+                        token = glob.glob("gdc-user-token*")
+
+                        if len(token) > 0:
+                            token = token[0]
+                        else:
+                            token = None
+
+                        statement.append(Sra.fetch_TCGA_fastq(acc,
+                                                              tar_name,
+                                                              token,
+                                                              tmpdir_fastq))
+
+                        files.append(os.path.join(
+                            tmpdir_fastq, acc + "_1.fastq.gz"))
+                        files.append(os.path.join(
+                            tmpdir_fastq, acc + "_2.fastq.gz"))
+
+                    else:
+                        raise ValueError("Unknown repository: %s" % repo)
+
+                if len(files) == 1 and files[0].endswith("_1.fastq.gz"):
+                    new_files = [re.sub("_1.fastq.gz",
+                                        ".fastq.gz",
+                                        files[0])]
+
+                elif len(files) == 2:
+                    new_files = [re.sub(r"_([12]).fastq.gz",
+                                        r".fastq.\1.gz",
+                                        x) for x in files]
+
+                else:
+                    new_files = files
+
+                out_base = os.path.basename(os.path.splitext(outfile)[0])
+                new_files = [re.sub(r"%s/(.+).(fastq..*gz)" % tmpdir_fastq,
+                                    r"%s/%s_\1.\2" % (tmpdir_fastq, out_base),
+                                    nf) for nf in new_files]
+
+                for old, new in zip(files, new_files):
+                    if old != new:
+                        statement.append("mv %s %s" % (old, new))
+
+                fastqfiles.append(new_files)
+
+            elif infile.endswith(".sra"):
+                # sneak preview to determine if paired end or single end
+                outdir = P.get_temp_dir()
+                f, format, datatype = Sra.peek(infile)
+                E.info("sra file contains the following files: %s" % f)
+
+                # T.S need to use abi-dump for colorspace files
+                if datatype == "basecalls":
+                    tool = "fastq-dump"
+                    self.datatype = "basecalls"
+                elif datatype == "colorspace":
+                    tool = "abi-dump"
+                    self.datatype = "solid"
+
+                # add extraction command to statement
+                statement.append(Sra.extract(infile, tmpdir_fastq, tool))
+
+                sra_extraction_files = ["%s/%s" % (
+                    tmpdir_fastq, os.path.basename(x)) for x in sorted(f)]
+
+                # if format is not sanger, add convert command to statement
+                if 'sanger' in format and self.convert:
+
+                    # single end fastq
+                    if len(sra_extraction_files) == 1:
+
+                        infile = sra_extraction_files[0]
+                        track = os.path.splitext(os.path.basename(infile))[0]
+                        if track.endswith("_1.fastq"):
+                            track = track[:-8]
+                        statement.append("""gunzip < %(infile)s
+                        | cgat fastq2fastq
+                        --method=change-format --target-format=sanger
+                        --guess-format=phred64
+                        --log=%(outfile)s.log
+                        %(compress_cmd)s
+                        > %(tmpdir_fastq)s/%(track)s_converted.fastq%(extension)s
+                        """ % locals())
+
+                        fastqfiles.append(
+                            ("%(tmpdir_fastq)s/%(track)s_converted.fastq%(extension)s"
+                             % locals(),))
+
+                    # paired end fastqs
+                    elif len(sra_extraction_files) == 2:
+
+                        infile, infile2 = sra_extraction_files
+                        track = os.path.splitext(os.path.basename(infile))[0]
+
+                        statement.append("""gunzip < %(infile)s
+                        | cgat fastq2fastq
+                        --method=change-format --target-format=sanger
+                        --guess-format=phred64
+                        --log=%(outfile)s.log %(compress_cmd)s
+                        > %(tmpdir_fastq)s/%(track)s_converted.1.fastq%(extension)s;
+                        gunzip < %(infile2)s
+                        | cgat fastq2fastq
+                        --method=change-format --target-format=sanger
+                        --guess-format=phred64
+                        --log=%(outfile)s.log %(compress_cmd)s
+                        > %(tmpdir_fastq)s/%(track)s_converted.2.fastq%(extension)s
+                        """ % locals())
+
+                        fastqfiles.append(
+                            ("%s/%s_converted.1.fastq%s" %
+                             (tmpdir_fastq, track, extension),
+                             "%s/%s_converted.2.fastq%s" %
+                             (tmpdir_fastq, track, extension)))
+                else:
+                    # Usually sra extraction files have format
+                    # '1_fastq.gz' for both single and paired end files
+                    # This code corrects the output to the format expected by
+                    # cgat s
+                    infile = sra_extraction_files[0]
+                    basename = os.path.basename(infile)
+
+                    if(len(sra_extraction_files) == 1 and
+                       basename.endswith("_1.fastq.gz") and
+                       self.datatype != "solid"):
+
+                        basename = basename[:-11] + ".fastq.gz"
+                        statement.append(
+                            "mv %s %s/%s" % (infile, tmpdir_fastq, basename))
+                        fastqfiles.append(
+                            ("%s/%s" % (tmpdir_fastq, basename),))
+
+                    # if sra extracted file is SOLID, need to keep
+                    # record of qual files
+                    elif self.datatype == "solid":
+                        # single end SOLiD data
+                        infile = P.snip(infile, "_1.fastq.gz") + \
+                            "_F3.csfasta.gz"
+                        quality = P.snip(
+                            infile, "_F3.csfasta.gz") + "_F3_QV.qual.gz"
+
+                        # qual file does not exist as tmpdir from
+                        # SRA.extract is removed
+                        # if not os.path.exists(quality):
+                        #    raise ValueError("no quality file for %s" % infile)
+
+                        fastqfiles.append((infile, quality))
+
+                    # T.S I'm not sure if this works. Need a test case!
+                    elif infile.endswith(".csfasta.F3.gz"):
+                        # paired end SOLiD data
+                        bn = P.snip(infile, ".csfasta.F3.gz")
+                        # order is important - mirrors tophat reads followed by
+                        # quals
+                        f = []
+                        for suffix in ("csfasta.F3", "csfasta.F5",
+                                       "qual.F3", "qual.F5"):
+                            fn = "%(bn)s.%(suffix)s" % locals()
+                            if not os.path.exists(fn + ".gz"):
+                                raise ValueError(
+                                    "expected file %s.gz missing" % fn)
+                            statement.append("""gunzip < %(fn)s.gz
+                            %(compress_cmd)s
+                            > %(tmpdir_fastq)s/%(basename)s.%(suffix)s%(extension)s
+                            """ %
+                                             locals())
+                            f.append(
+                                "%(tmpdir_fastq)s/%(basename)s.%(suffix)s%(extension)s" %
+                                locals())
+                        fastqfiles.append(f)
+
+                    elif len(sra_extraction_files) == 2:
+                        infile2 = sra_extraction_files[1]
+                        if basename.endswith("_1.fastq.gz"):
+                            basename1 = basename[:-11] + ".fastq.1.gz"
+                            basename2 = basename[:-11] + ".fastq.2.gz"
+                        statement.append(
+                            "mv %s %s/%s; mv %s %s/%s" %
+                            (infile, tmpdir_fastq, basename1,
+                             infile2, tmpdir_fastq, basename2))
+                        fastqfiles.append(
+                            ("%s/%s" % (tmpdir_fastq, basename1),
+                             "%s/%s" % (tmpdir_fastq, basename2)))
+
+                    else:
+                        fastqfiles.append(sra_extraction_files)
+
+            elif infile.endswith(".fastq.gz"):
+                format = Fastq.guessFormat(
+                    iotools.open_file(infile, "r"), raises=False)
+                if 'sanger' not in format and self.convert:
+                    statement.append("""gunzip < %(infile)s
+                    | cgat fastq2fastq
+                    --method=change-format --target-format=sanger
+                    --guess-format=%(qual_format)s
+                    --log=%(outfile)s.log
+                    %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.fastq%(extension)s""" %
+                                     locals())
+                    fastqfiles.append(
+                        ("%s/%s.fastq%s" % (tmpdir_fastq, track, extension),))
+                else:
+                    E.debug("%s: assuming quality score format %s" %
+                            (infile, format))
+                    fastqfiles.append((infile, ))
+
+            elif infile.endswith(".csfasta.gz"):
+                # single end SOLiD data
+                if self.preserve_colourspace:
+                    quality = P.snip(infile, ".csfasta.gz") + ".qual.gz"
+                    if not os.path.exists(quality):
+                        raise ValueError("no quality file for %s" % infile)
+                    statement.append("""gunzip < %(infile)s
+                    > %(tmpdir_fastq)s/%(track)s.csfasta%(extension)s""" %
+                                     locals())
+                    statement.append("""gunzip < %(quality)s
+                    > %(tmpdir_fastq)s/%(track)s.qual%(extension)s""" %
+                                     locals())
+                    fastqfiles.append(("%s/%s.csfasta%s" %
+                                       (tmpdir_fastq, track, extension),
+                                       "%s/%s.qual%s" %
+                                       (tmpdir_fastq, track, extension)))
+                    self.datatype = "solid"
+                else:
+                    quality = P.snip(infile, ".csfasta.gz") + ".qual.gz"
+
+                    statement.append("""solid2fastq
+                    <(gunzip < %(infile)s) <(gunzip < %(quality)s)
+                    %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.fastq%(extension)""" %
+                                     locals())
+                    fastqfiles.append(
+                        ("%s/%s.fastq%s" % (tmpdir_fastq, track, extension),))
+
+            elif infile.endswith(".csfasta.F3.gz"):
+                # paired end SOLiD data
+                if self.preserve_colourspace:
+                    bn = P.snip(infile, ".csfasta.F3.gz")
+                    # order is important - mirrors tophat reads followed by
+                    # quals
+                    f = []
+                    for suffix in ("csfasta.F3", "csfasta.F5",
+                                   "qual.F3", "qual.F5"):
+                        fn = "%(bn)s.%(suffix)s" % locals()
+                        if not os.path.exists(fn + ".gz"):
+                            raise ValueError(
+                                "expected file %s.gz missing" % fn)
+                        statement.append("""gunzip < %(fn)s.gz
+                        %(compress_cmd)s
+                        > %(tmpdir_fastq)s/%(track)s.%(suffix)s%(extension)s
+                        """ %
+                                         locals())
+                        f.append(
+                            "%(tmpdir_fastq)s/%(track)s.%(suffix)s%(extension)s" %
+                            locals())
+                    fastqfiles.append(f)
+                    self.datatype = "solid"
+                else:
+                    quality = P.snip(infile, ".csfasta.gz") + ".qual.gz"
+
+                    statement.append("""solid2fastq
+                    <(gunzip < %(infile)s) <(gunzip < %(quality)s)
+                    %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.fastq%(extension)s""" %
+                                     locals())
+                    fastqfiles.append(
+                        ("%s/%s.fastq%s" % (tmpdir_fastq, track, extension),))
+
+            elif infile.endswith(".fastq.1.gz"):
+
+                bn = P.snip(infile, ".fastq.1.gz")
+                infile2 = "%s.fastq.2.gz" % bn
+                if not os.path.exists(infile2):
+                    raise ValueError(
+                        "can not find paired ended file "
+                        "'%s' for '%s'" % (infile2, infile))
+
+                format = Fastq.guessFormat(
+                    iotools.open_file(infile), raises=False)
+
+                if 'sanger' not in format and qual_format != 'phred64':
+                    statement.append("""gunzip < %(infile)s
+                    | cgat fastq2fastq
+                    --method=change-format --target-format=sanger
+                    --guess-format=%(qual_format)s
+                    --log=%(outfile)s.log
+                    %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.1.fastq%(extension)s;
+                    gunzip < %(infile2)s
+                    | cgat fastq2fastq
+                    --method=change-format --target-format=sanger
+                    --guess-format=%(qual_format)s
+                    --log=%(outfile)s.log
+                    %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.2.fastq%(extension)s
+                    """ % locals())
+                    fastqfiles.append(
+                        ("%s/%s.1.fastq%s" % (tmpdir_fastq, track, extension),
+                         "%s/%s.2.fastq%s" % (tmpdir_fastq, track, extension)))
+
+                elif 'sanger' not in format and qual_format == 'phred64':
+                    statement.append("""gunzip < %(infile)s
+                    | cgat fastq2fastq
+                    --method=change-format --target-format=sanger
+                    --guess-format=%(qual_format)s
+                    --log=%(outfile)s.log
+                    %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.1.fastq%(extension)s;
+                    gunzip < %(infile2)s
+                    | cgat fastq2fastq
+                    --method=change-format --target-format=sanger
+                    --guess-format=%(qual_format)s
+                    --log=%(outfile)s.log
+                    %(compress_cmd)s
+                    > %(tmpdir_fastq)s/%(track)s.2.fastq%(extension)s
+                    """ % locals())
+                    fastqfiles.append(
+                        ("%s/%s.1.fastq%s" % (tmpdir_fastq, track, extension),
+                         "%s/%s.2.fastq%s" % (tmpdir_fastq, track, extension)))
+                else:
+                    E.debug("%s: assuming quality score format %s" %
+                            (infile, format))
+                    fastqfiles.append((infile,
+                                       infile2,))
+
+            else:
+                raise NotImplementedError("unknown file format %s" % infile)
+
+        assert len(fastqfiles) > 0, "no fastq files for mapping"
+        return (" ; ".join(statement) + ";", fastqfiles)
+
+
+class Mapper(SequenceCollectionProcessor):
+    '''Base class for short-read mappers.
+
+    These tools map reads in :term:`fastq` or :term:`sra` formatted
+    files and outut a :term:`BAM` formatted file.
+
+    .. note::
+        This class just sets the attributes below, but is not
+        implementing them.
+
+    Attributes
+    ----------
+    datatype : string
+        Datatype of input
+    strip_sequence : bool
+        If True, remove sequence from BAM files in post-processing
+        step.
+    remove_non_unique : bool
+        If True, remove non-unique matches from the BAM file. This
+        processing will happen in addition to any filters applied
+        in the mapper.
+
+    Arguments
+    ---------
+    executable : string
+        Executable to use. If unset, use default.
+    strip_sequence : bool
+        If True, remove sequence from BAM files in post-processing.
+    remove_non_unique : bool
+        If True, remove non-unique matches from the BAM file. This
+        processing will happen in addition to any filters applied
+        in the mapper.
+    tool_options : string
+        Options to be passed to the processing tool.
+
+    '''
+
+    datatype = "fastq"
+
+    # strip bam files of sequenca and quality information
+    strip_sequence = False
+
+    # remove non-unique matches in a post-processing step.
+    # Many aligners offer this option in the mapping stage
+    # If only unique matches are required, it is better to
+    # configure the aligner as removing in post-processing
+    # adds to processing time.
+    remove_non_unique = False
+
+    def __init__(self,
+                 executable=None,
+                 strip_sequence=False,
+                 remove_non_unique=False,
+                 tool_options="",
+                 *args, **kwargs):
+        SequenceCollectionProcessor.__init__(self, *args, **kwargs)
+
+        if executable:
+            self.executable = executable
+        self.strip_sequence = strip_sequence
+        self.remove_non_unique = remove_non_unique
+
+        # tool options to be passed on to the mapping tool
+        self.tool_options = tool_options
+
+    def mapper(self, infiles, outfile):
+        '''build mapping statement on infiles.
+        '''
+        return ""
+
+    def postprocess(self, infiles, outfile):
+        '''collect output data and postprocess.'''
+        return ""
+
+    def cleanup(self, outfile):
+        '''clean up.'''
+        statement = '''rm -rf %s;''' % (self.tmpdir_fastq)
+
+        return statement
+
+    def build(self, infiles, outfile):
+        '''run mapper
+
+        This method combines the output of the :meth:`preprocess`,
+        :meth:`mapper`, :meth:`postprocess` and :meth:`clean` sections
+        into a single statement.
+
+        Arguments
+        ---------
+        infiles : list
+             List of input filenames
+        outfile : string
+             Output filename
+
+        Returns
+        -------
+        statement : string
+             A command line statement. The statement can be a series
+             of commands separated by ``;`` and/or can be unix pipes.
+
+        '''
+
+        cmd_preprocess, mapfiles = self.preprocess(infiles, outfile)
+        cmd_mapper = self.mapper(mapfiles, outfile)
+        cmd_postprocess = self.postprocess(infiles, outfile)
+        cmd_clean = self.cleanup(outfile)
+
+        assert cmd_preprocess.strip().endswith(";"),\
+            "missing ';' at end of command %s" % cmd_preprocess.strip()
+        assert cmd_mapper.strip().endswith(";"),\
+            "missing ';' at end of command %s" % cmd_mapper.strip()
+        if cmd_postprocess:
+            assert cmd_postprocess.strip().endswith(";"),\
+                "missing ';' at end of command %s" % cmd_postprocess.strip()
+        if cmd_clean:
+            assert cmd_clean.strip().endswith(";"),\
+                "missing ';' at end of command %s" % cmd_clean.strip()
+
+        statement = " ".join((cmd_preprocess,
+                              cmd_mapper,
+                              cmd_postprocess,
+                              cmd_clean))
+
+        return statement
+
+
+class Kallisto(Mapper):
+
+    '''run Kallisto to quantify transcript abundance from fastq files
+    - set pseudobam to True to output a pseudobam along with the quantification'''
+
+    def __init__(self, pseudobam=False, readable_suffix=False, *args, **kwargs):
+        Mapper.__init__(self, *args, **kwargs)
+
+        self.pseudobam = pseudobam
+        self.readable_suffix = readable_suffix
+
+    def mapper(self, infiles, outfile):
+        '''build mapping statement on infiles'''
+
+        tmpdir = os.path.join(self.tmpdir_fastq + "kallisto")
+
+        logfile = outfile + ".log"
+
+        num_files = [len(x) for x in infiles]
+
+        if max(num_files) != min(num_files):
+            raise ValueError(
+                "mixing single and paired-ended data not possible.")
+
+        nfiles = max(num_files)
+
+        if nfiles == 1:
+
+            infiles = (" --fragment-length=%(kallisto_fragment_length)s" +
+                       " --sd=%(kallisto_fragment_sd)s" +
+                       " --single %s" % " ".join([x[0] for x in infiles]))
+
+        elif nfiles == 2:
+            infiles = " ".join([" ".join(x) for x in infiles])
+
+        else:
+            raise ValueError("incorrect number of input files")
+
+        outdir = os.path.dirname(outfile)
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+
+        statement = '''
+        kallisto quant %%(kallisto_options)s
+        -t %%(job_threads)s
+        --bootstrap-samples=%%(kallisto_bootstrap)s
+        -i %%(index)s -o %(tmpdir)s %(infiles)s''' % locals()
+
+        if self.pseudobam:
+            statement += '''
+            --pseudobam | samtools view -b -
+            > %(outfile)s.bam 2> %(logfile)s;''' % locals()
+        else:
+            statement += ''' > %(logfile)s &> %(logfile)s ;''' % locals()
+
+        self.tmpdir = tmpdir
+
+        return statement
+
+    def postprocess(self, infiles, outfile):
+        '''move outfiles from tmpdir to final location'''
+
+        tmpdir = self.tmpdir
+
+        statement = ('''
+        mv -f %(tmpdir)s/abundance.h5 %(outfile)s;
+        ''' % locals())
+
+        if self.readable_suffix:
+
+            outfile_readable = outfile + self.readable_suffix
+            statement += ('''
+            kallisto h5dump -o %(tmpdir)s %(outfile)s;
+            mv %(tmpdir)s/abundance.tsv %(outfile_readable)s;
+            rm -rf %(tmpdir)s/bs_abundance_*.tsv;''' % locals())
+
+        return statement
+
+    def cleanup(self, outfile):
+        '''clean up.'''
+        statement = '''rm -rf %s; rm -rf %s;''' % (
+            self.tmpdir_fastq, self.tmpdir)
+
+        return statement
+        
+        
 def normaliseCounts(counts_inf, outfile, method):
     ''' normalise a counts table'''
 
@@ -80,19 +766,6 @@ def normaliseCounts(counts_inf, outfile, method):
         counts.table.to_csv(outfile, sep="\t", compression="gzip")
     else:
         counts.table.to_csv(outfile, sep="\t")
-
-
-def convertFromFishToBear(infile):
-    ''' convert sailfish/salmon output to kallisto(bear)-like, Sleuth
-    compatible h5 file'''
-
-    infile = os.path.dirname(infile)
-
-    convert = R('''library(wasabi)
-    prepare_fish_for_sleuth("%(infile)s", force=TRUE)
-    ''' % locals())
-
-    convert
 
 
 def parse_table(sample, outfile_raw, outfile, columnname):
@@ -241,146 +914,6 @@ class Quantifier(object):
         self.run_gene()
 
 
-class FeatureCountsQuantifier(Quantifier):
-    ''' quantifier class to run featureCounts '''
-
-    def run_featurecounts(self, level="gene_id"):
-        ''' function to run featureCounts at the transcript-level or gene-level
-
-        If `bamfile` is paired, paired-end counting is enabled and the bam
-        file automatically sorted.
-
-        '''
-
-        bamfile = self.infile
-        job_threads = self.job_threads
-        strand = self.strand
-        options = self.options
-        annotations = self.annotations
-        sample = self.sample
-
-        if level == "gene_id":
-            outfile = self.gene_outfile
-        elif level == "transcript_id":
-            outfile = self.transcript_outfile
-        else:
-            raise ValueError("level must be gene_id or transcript_id!")
-
-        # -p -B specifies count fragments rather than reads, and both
-        # reads must map to the feature
-        # for legacy reasons look at feature_counts_paired
-        if BamTools.is_paired(bamfile):
-            # sort bamfile
-            bam_tmp = '${TMPDIR}/' + os.path.basename(bamfile)
-            # select paired end mode, additional options
-            paired_options = "-p -B"
-            # sort by read name
-            paired_processing = \
-                """samtools
-                sort -@ %(job_threads)i -n -o %(bam_tmp)s %(bamfile)s;
-                """ % locals()
-            bamfile = bam_tmp
-        else:
-            paired_options = ""
-            paired_processing = ""
-
-        # raw featureCounts output saved to ".raw" file
-        outfile_raw = P.snip(outfile, ".gz") + ".raw"
-        outfile_dir = os.path.dirname(outfile)
-        if not os.path.exists(outfile_dir):
-            os.makedirs(outfile_dir)
-
-        statement = '''zcat %(annotations)s > ${TMPDIR}/geneset.gtf;
-                       %(paired_processing)s
-                       featureCounts %(options)s
-                                     -T %(job_threads)i
-                                     -s %(strand)s
-                                     -a ${TMPDIR}/geneset.gtf
-                                     %(paired_options)s
-                                     -o %(outfile_raw)s -g %(level)s
-                                     %(bamfile)s
-                        >& %(outfile)s.log;
-                        gzip -f %(outfile_raw)s
-        '''
-        P.run(statement)
-
-        # parse output to extract counts
-        parse_table(self.sample, outfile_raw + ".gz",
-                    outfile, "%s.bam" % self.sample)
-
-    def run_transcript(self):
-        ''' generate transcript-level quantification estimates'''
-        self.run_featurecounts(level="transcript_id")
-
-    def run_gene(self):
-        ''' generate gene-level quantification estimates'''
-        self.run_featurecounts(level="gene_id")
-
-
-class Gtf2tableQuantifier(Quantifier):
-    ''' quantifier class to run gtf2table'''
-
-    def run_gtf2table(self, level="gene_id"):
-        ''' function to run gtf2table script at the transcript-level
-        or gene-level'''
-
-        bamfile = self.infile
-        annotations = self.annotations
-        sample = self.sample
-
-        # define the quantification level
-        if level == "gene_id":
-            outfile = self.gene_outfile
-            reporter = "genes"
-        elif level == "transcript_id":
-            outfile = self.transcript_outfile
-            reporter = "transcripts"
-        else:
-            raise ValueError("level must be gene_id or transcript_id!")
-
-        if BamTools.is_paired(bamfile):
-            counter = 'readpair-counts'
-        else:
-            counter = 'read-counts'
-
-        outfile_raw = P.snip(outfile, ".gz") + ".raw"
-
-        outfile_dir = os.path.dirname(outfile)
-        if not os.path.exists(outfile_dir):
-            os.makedirs(outfile_dir)
-
-        # ignore multi-mapping reads ("--multi-mapping-method=ignore")
-        statement = '''
-        zcat %(annotations)s
-        | cgat gtf2table
-              --reporter=%(reporter)s
-              --bam-file=%(bamfile)s
-              --counter=length
-              --column-prefix="exons_"
-              --counter=%(counter)s
-              --column-prefix=""
-              --counter=read-coverage
-              --column-prefix=coverage_
-              --min-mapping-quality=%(counting_min_mapping_quality)i
-              --multi-mapping-method=ignore
-              --log=%(outfile_raw)s.log
-        > %(outfile_raw)s;
-        gzip -f %(outfile_raw)s
-        '''
-
-        P.run(statement)
-        # parse output to extract counts
-        parse_table(self.sample, outfile_raw + ".gz", outfile, 'counted_all')
-
-    def run_transcript(self):
-        ''' generate transcript-level quantification estimates'''
-        self.run_gtf2table(level="transcript_id")
-
-    def run_gene(self):
-        ''' generate gene-level quantification estimates'''
-        self.run_gtf2table(level="gene_id")
-
-
 class AF_Quantifier(Quantifier):
     ''' Parent class for all alignment-free quantification methods'''
 
@@ -423,7 +956,7 @@ class KallistoQuantifier(AF_Quantifier):
         # Supplying a "readable_suffix" to the mapping.Kallisto
         # ensures an additional human readable file is also generated
         readable_suffix = ".tsv"
-        m = mapping.Kallisto(readable_suffix=readable_suffix)
+        m = Kallisto(readable_suffix=readable_suffix)
 
         statement = m.build((fastqfile), outfile)
 
@@ -434,64 +967,6 @@ class KallistoQuantifier(AF_Quantifier):
         # parse the output to extract the counts
         parse_table(self.sample, outfile_readable,
                     self.transcript_outfile, 'est_counts')
-
-
-class SailfishQuantifier(AF_Quantifier):
-    ''' quantifier class to run sailfish'''
-
-    def run_transcript(self):
-        fastqfile = self.infile
-        index = self.annotations
-        job_threads = self.job_threads
-        job_memory = self.job_memory
-
-        sailfish_options = self.options
-        sailfish_bootstrap = self.bootstrap
-        sailfish_libtype = self.libtype
-        outfile = os.path.join(
-            os.path.dirname(self.transcript_outfile), "quant.sf")
-        sample = self.sample
-
-        m = mapping.Sailfish()
-
-        statement = m.build((fastqfile), outfile)
-
-        P.run(statement)
-
-        # parse the output to extract the counts
-        parse_table(self.sample, outfile,
-                    self.transcript_outfile, 'NumReads')
-
-        convertFromFishToBear(outfile)
-
-
-class SalmonQuantifier(AF_Quantifier):
-    '''quantifier class to run salmon'''
-    def run_transcript(self):
-        fastqfile = self.infile
-        index = self.annotations
-        job_threads = self.job_threads
-        job_memory = self.job_memory
-        biascorrect = self.biascorrect
-
-        salmon_options = self.options
-        salmon_bootstrap = self.bootstrap
-        salmon_libtype = self.libtype
-        outfile = os.path.join(
-            os.path.dirname(self.transcript_outfile), "quant.sf")
-        sample = self.sample
-
-        m = mapping.Salmon(bias_correct=biascorrect)
-
-        statement = m.build((fastqfile), outfile)
-
-        P.run(statement)
-
-        # parse the output to extract the counts
-        parse_table(self.sample, outfile,
-                    self.transcript_outfile, 'NumReads')
-
-        convertFromFishToBear(outfile)
 
 
 @cluster_runnable
