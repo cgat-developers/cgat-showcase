@@ -287,6 +287,36 @@ def run_kallisto(infiles, outfiles):
     statement = """kallisto quant -i %(index)s %(kallisto_options)s -o %(outfile)s %(fastqfile)s"""
     P.run(statement)
 
+
+###################################################
+# Generate transcript2gene infomation
+###################################################
+
+@originate("transcript2geneMap.tsv")
+def getTranscript2GeneMap(outfile):
+    ''' Extract a 1:1 map of transcript_id to gene_id from the geneset '''
+
+    iterator = GTF.iterator(iotools.open_file(PARAMS['geneset']))
+    transcript2gene_dict = {}
+
+    for entry in iterator:
+
+        # Check the same transcript_id is not mapped to multiple gene_ids!
+        if entry.transcript_id in transcript2gene_dict:
+            if not entry.gene_id == transcript2gene_dict[entry.transcript_id]:
+                raise ValueError('''multipe gene_ids associated with
+                the same transcript_id %s %s''' % (
+                    entry.gene_id,
+                    transcript2gene_dict[entry.transcript_id]))
+        else:
+            transcript2gene_dict[entry.transcript_id] = entry.gene_id
+
+    with iotools.open_file(outfile, "w") as outf:
+        outf.write("transcript_id\tgene_id\n")
+        for key, value in sorted(transcript2gene_dict.items()):
+            outf.write("%s\t%s\n" % (key, value))
+
+
 ###################################################
 ###################################################
 # Create quantification targets
@@ -327,7 +357,7 @@ DESIGNS = tracks.Tracks(Sample).loadFromDirectory(
     glob.glob("design*.tsv"), "design(\S+).tsv")
 
 @mkdir("DEresults.dir/deseq2")
-@product(mergeCounts,
+@product(merge_tpm,
          formatter(".*/(?P<QUANTIFIER>\S+).dir/transcripts.tsv.gz"),
          ["design%s.tsv" % x.asFile() for x in DESIGNS],
          formatter(".*/design(?P<DESIGN>\S+).tsv$"),
@@ -399,7 +429,7 @@ def runDESeq2(infiles, outfiles, design_name):
 
 
 @mkdir("DEresults.dir/sleuth")
-@product(mergeCounts,
+@product(merge_tpm,
          formatter(
              ".*/(?P<QUANTIFIER>(kallisto|salmon|sailfish)).dir/transcripts.tsv.gz"),
          ["design%s.tsv" % x.asFile() for x in DESIGNS],
@@ -509,7 +539,7 @@ def runSleuth(infiles, outfiles, design_name, quantifier):
         P.run(statement)
 
 @mkdir("DEresults.dir/deseq2")
-@transform(mergeCounts,
+@transform(merge_tpm,
            regex("(\S+).dir/transcripts.tsv.gz"),
            [r"DEresults.dir/deseq2/\1_normalised_transcripts_expression.tsv.gz",
             r"DEresults.dir/deseq2/\1_normalised_genes_expression.tsv.gz"])
@@ -534,7 +564,7 @@ def getDESeqNormExp(infiles, outfiles):
 
 @mkdir("DEresults.dir/sleuth")
 @collate(
-    runKallisto,
+    run_kallisto,
     formatter(
         "(?P<QUANTIFIER>(kallisto|salmon|sailfish)).dir/(\S+)/transcripts.tsv.gz"),
     [r"DEresults.dir/sleuth/{QUANTIFIER[0]}_normalised_transcripts_expression.tsv.gz",
