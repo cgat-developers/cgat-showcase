@@ -215,6 +215,10 @@ def buildKallistoIndex(infile, outfile):
     P.run(statement)
 
 
+#################################################
+# Run alignment free quantification - kallisto
+#################################################
+
 DATADIR = "."
 
 SEQUENCESUFFIXES = ("*.fastq.1.gz",
@@ -286,36 +290,6 @@ def run_kallisto(infiles, outfiles):
     outfile = outfiles[0].replace("abundance.h5","")
     statement = """kallisto quant -i %(index)s %(kallisto_options)s -o %(outfile)s %(fastqfile)s"""
     P.run(statement)
-
-
-###################################################
-# Generate transcript2gene infomation
-###################################################
-
-@originate("transcript2geneMap.tsv")
-def getTranscript2GeneMap(outfile):
-    ''' Extract a 1:1 map of transcript_id to gene_id from the geneset '''
-
-    iterator = GTF.iterator(iotools.open_file(PARAMS['geneset']))
-    transcript2gene_dict = {}
-
-    for entry in iterator:
-
-        # Check the same transcript_id is not mapped to multiple gene_ids!
-        if entry.transcript_id in transcript2gene_dict:
-            if not entry.gene_id == transcript2gene_dict[entry.transcript_id]:
-                raise ValueError('''multipe gene_ids associated with
-                the same transcript_id %s %s''' % (
-                    entry.gene_id,
-                    transcript2gene_dict[entry.transcript_id]))
-        else:
-            transcript2gene_dict[entry.transcript_id] = entry.gene_id
-
-    with iotools.open_file(outfile, "w") as outf:
-        outf.write("transcript_id\tgene_id\n")
-        for key, value in sorted(transcript2gene_dict.items()):
-            outf.write("%s\t%s\n" % (key, value))
-
 
 ###################################################
 ###################################################

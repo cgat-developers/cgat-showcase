@@ -27,8 +27,8 @@ design = read.table(opt$design, header=TRUE, fill=TRUE)
 
 
 dir <- "kallisto.dir"
-
-files <- file.path(dir, samples$track, "abundance.h5")
+sample_track <- design$track
+files <- file.path(dir, sample_track, "abundance.h5")
 
 
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
