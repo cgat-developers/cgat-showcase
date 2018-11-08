@@ -46,14 +46,14 @@ dds <- DESeqDataSetFromTximport(txi.kallisto, design, ~ group)
 reduced_model = opt$reduced
 
 dds = suppressMessages(
-  DESeq(dds, test="LRT", reduced=reduced_model, betaPrior=TRUE, fitType="parametric"))
+  DESeq(dds, test="LRT", reduced=formula(reduced_model), betaPrior=FALSE, fitType="parametric"))
 
 contrast <- opt$contrast
 
-contrast_levels <- levels(dds@colData$contrast)
+contrast_levels <- levels(dds@colData$group)
 
-res = suppressMessages(results(dds, addMLE=TRUE,
-				contrast=contrast,contrast_levels[2], contrast_levels[1]))
+res = suppressMessages(results(dds,
+				contrast=c("group",contrast_levels[2], contrast_levels[1])))
 res = as.data.frame(res)
 
 dir.create("plots.dir/", showWarnings = FALSE)
