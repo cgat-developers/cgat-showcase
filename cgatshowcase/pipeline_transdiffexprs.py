@@ -330,16 +330,29 @@ def run_deseq2(infiles, outfile):
 ###################################################
 
 # both multiqc and Rmarkdown
+@follows(mkdir("MultiQC_report.dir"))
 @follows(run_deseq2)
-@originate()
 def run_multiqc_report():
     '''This will generate a mutiqc report '''
-    pass
+        statement = (
+        "export LC_ALL=en_GB.UTF-8 && "
+        "export LANG=en_GB.UTF-8 && "
+        "multiqc . -f && "
+        "mv multiqc_report.html MultiQC_report.dir/")
+    P.run(statement)
+
+
 @follows(run_deseq2)
-@originate()
 def run_rmarkdown_report():
     '''This will generate a rmarkdown report '''
-    pass
+
+    report_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                               'pipeline_docs',
+                                               'pipeline_transdiffexprs',
+                                               'R_report'))
+
+    statement = '''cp %(report_path)s/* R_report.dir ; cd R_report.dir ; R -e "rmarkdown::render_site()"'''
+    P.run(statement)
 
 ###################################################
 # target functions for code execution             #
