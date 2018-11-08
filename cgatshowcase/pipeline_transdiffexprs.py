@@ -19,8 +19,7 @@ The pipeline performs the following
      gene level. The following alignment-free expression estimation
      methods are implemented:
       * kallisto_
-      * salmon_
-      * sailfish_
+
 
    * Perform differential expression analysis using DeSeq2
    
@@ -36,7 +35,7 @@ Configuration
 -------------
 
 The pipeline requires a pipeline.yml configuration file. This is located
-within the pipeline_transdiffexpress/ directory.
+within the ?? directory.
 
 Input
 -----
@@ -59,7 +58,7 @@ Design matrices
 Design matrices are imported by placing :term:`tsv` formatted files
 into the :term:`working directory`. A design matrix describes the
 experimental design to test. The design files should be named
-design*.tsv. An example can be found in the pipeline_transdiffexprs/ directory.
+design*.tsv. An example can be found ???.
 
 Each design file has at leasr four columns but may contain any number
 of columns after the 'pair' column:
@@ -96,24 +95,7 @@ Pipeline output
 Quantification
 --------------
 
-The quantification estimates from each method are outputted to:
-[method].dir/[sample]/[level].tsv.gz, where [method] is the quantification method, [sample] is the sample
-name and [level] is the feature level (transcript or gene)
 
-Each tool also generates specific log files etc which are outputted, along with the raw quantification outfile in the directory:
-[method].dir/[sample]
-
-For each method, the merged counts are outputted to:
-[method].dir/[level].tsv.gz
-
-Differential gene expression results
--------------------------------------
-
-Results are stored per method in subdirectories
-such as :file:`deseq.dir`
-
-Plots from the differential expression analyses are also contained
-within the directories.
 
 
 Code
@@ -333,31 +315,38 @@ def merge_tpm(infiles, outfile):
 def run_deseq2(infiles, outfile):
     ''' run DESeq2 to identify differentially expression'''
 
-  
-    statement = '''Rscript '''
-    P.run(statement)
+    if PARAMS["deseq_ltr"]:
 
+        statement = '''Rscript ../cgat-developers-v5/cgat-showcase/R/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
+        P.run(statement)
 
+    elif PARAMS['deseq_wald']:
+        
+        statement = '''Rscript ../cgat-developers-v5/cgat-showcase/R/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
+        P.run(statement)
 
-@mkdir("DEresults.dir/sleuth")
-@merge(run_kallisto,
-         ["DESEq2.dir/counts.tsv.gz"])
-def runSleuth(infiles, outfile):
-    ''' run sleuth to identify differentially expression'''
+###################################################
+# Generate a report
+###################################################
 
-    statement = ''''''
-
-    P.run(statement)
-
-
-
+# both multiqc and Rmarkdown
+@follows(run_deseq2)
+@originate()
+def run_multiqc_report():
+    '''This will generate a mutiqc report '''
+    pass
+@follows(run_deseq2)
+@originate()
+def run_rmarkdown_report():
+    '''This will generate a rmarkdown report '''
+    pass
 
 ###################################################
 # target functions for code execution             #
 ###################################################
-
+@follows(run_multiqc_report, run_rmarkdown_report)
 def full():
-    ''' dummy task for full ruffus tasks'''
+    'dummy task for full ruffus tasks'
     pass
 
 def main(argv=None):
