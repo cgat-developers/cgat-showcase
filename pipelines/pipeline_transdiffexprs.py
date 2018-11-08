@@ -124,6 +124,7 @@ Code
 
 # Load modules
 from ruffus import *
+from ruffus.combinatorics import *
 
 import sys
 import os
@@ -138,6 +139,7 @@ from cgatcore import pipeline as P
 
 import tasks.mapping as mapping
 import tasks.rnaseq as rnaseq
+import tasks.tracks as tracks
 
 
 # load options from the config file
@@ -147,6 +149,7 @@ P.get_parameters(
      "pipeline.yml"])
 
 PARAMS = P.PARAMS
+
 
 @mkdir('geneset.dir')
 @transform(PARAMS['geneset'],
@@ -212,110 +215,27 @@ def buildKallistoIndex(infile, outfile):
     P.run(statement)
 
 
-@transform(buildReferenceTranscriptome,
-           suffix(".fa"),
-           ".salmon.index")
-def buildSalmonIndex(infile, outfile):
-    '''
-    Builds a salmon index for the reference transriptome
-    Parameters
-    ----------
-    infile: str
-       path to reference transcriptome - fasta file containing transcript
-       sequences
-    salmon_kmer: int
-       :term: `PARAMS` kmer size for sailfish.  Default is 31.
-       Salmon will ignores transcripts shorter than this.
-    salmon_index_options: str
-       :term: `PARAMS` string to append to the salmon index command to
-       provide specific options e.g. --force --threads N
-    outfile: str
-       path to output file
-    '''
-
-    job_memory = "6G"
-    # need to remove the index directory (if it exists) as ruffus uses
-    # the directory timestamp which wont change even when re-creating
-    # the index files
-    statement = '''
-    rm -rf %(outfile)s;
-    salmon index %(salmon_index_options)s -t %(infile)s -i %(outfile)s
-    -k %(salmon_kmer)s
-    '''
-
-    P.run(statement)
-
-
-@originate("transcript2geneMap.tsv")
-def getTranscript2GeneMap(outfile):
-    ''' Extract a 1:1 map of transcript_id to gene_id from the geneset '''
-
-    iterator = GTF.iterator(iotools.open_file(PARAMS['geneset']))
-    transcript2gene_dict = {}
-
-    for entry in iterator:
-
-        # Check the same transcript_id is not mapped to multiple gene_ids!
-        if entry.transcript_id in transcript2gene_dict:
-            if not entry.gene_id == transcript2gene_dict[entry.transcript_id]:
-                raise ValueError('''multipe gene_ids associated with
-                the same transcript_id %s %s''' % (
-                    entry.gene_id,
-                    transcript2gene_dict[entry.transcript_id]))
-        else:
-            transcript2gene_dict[entry.transcript_id] = entry.gene_id
-
-    with iotools.open_file(outfile, "w") as outf:
-        outf.write("transcript_id\tgene_id\n")
-        for key, value in sorted(transcript2gene_dict.items()):
-            outf.write("%s\t%s\n" % (key, value))
+#################################################
+# Run alignment free quantification - kallisto
+#################################################
 
 DATADIR = "."
 
 SEQUENCESUFFIXES = ("*.fastq.1.gz",
-                    "*.fastq.gz",
-                    "*.sra")
+                    "*.fastq.gz")
 SEQUENCEFILES = tuple([os.path.join(DATADIR, suffix_name)
                        for suffix_name in SEQUENCESUFFIXES])
 
-# enable multiple fastqs from the same sample to be analysed together
-if "merge_pattern_input" in PARAMS and PARAMS["merge_pattern_input"]:
-    SEQUENCEFILES_REGEX = regex(
-        r"%s/%s.(fastq.1.gz|fastq.gz|sra)" % (
-            DATADIR, PARAMS["merge_pattern_input"].strip()))
-
-    # the last expression counts number of groups in pattern_input
-    SEQUENCEFILES_KALLISTO_OUTPUT = [
-        r"kallisto.dir/%s/transcripts.tsv.gz" % (
-            PARAMS["merge_pattern_output"].strip()),
-        r"kallisto.dir/%s/genes.tsv.gz" % (
-            PARAMS["merge_pattern_output"].strip())]
-
-    SEQUENCEFILES_SALMON_OUTPUT = [
-        r"salmon.dir/%s/transcripts.tsv.gz" % (
-            PARAMS["merge_pattern_output"].strip()),
-        r"salmon.dir/%s/genes.tsv.gz" % (
-            PARAMS["merge_pattern_output"].strip())]
-
-else:
-    SEQUENCEFILES_REGEX = regex(
-        "(\S+).(fastq.1.gz|fastq.gz|sra)")
-
-    SEQUENCEFILES_KALLISTO_OUTPUT = [
-        r"kallisto.dir/\1/transcripts.tsv.gz",
-        r"kallisto.dir/\1/genes.tsv.gz"]
-
-    SEQUENCEFILES_SALMON_OUTPUT = [
-        r"salmon.dir/\1/transcripts.tsv.gz",
-        r"salmon.dir/\1/genes.tsv.gz"]
+SEQUENCEFILES_REGEX = regex(
+        "(\S+).(fastq.1.gz|fastq.gz)")
 
 
 @follows(mkdir("kallisto.dir"))
 @collate(SEQUENCEFILES,
          SEQUENCEFILES_REGEX,
-         add_inputs(buildKallistoIndex, getTranscript2GeneMap),
-         SEQUENCEFILES_KALLISTO_OUTPUT)
-def runKallisto(infiles, outfiles):
+         add_inputs(buildKallistoIndex),
+         [r"kallisto.dir/\1/abundance.h5",r"kallisto.dir/\1/abundance.tsv"])
+def run_kallisto(infiles, outfiles):
     '''
     Computes read counts across transcripts and genes based on a fastq
     file and an indexed transcriptome using Kallisto.
@@ -353,89 +273,88 @@ def runKallisto(infiles, outfiles):
        paths to output files for transcripts and genes
     '''
 
-    # TS more elegant way to parse infiles and index?
-    fastqfile = [x[0] for x in infiles]
+    fastqfile = infiles[0][0]
     index = infiles[0][1]
-    transcript2geneMap = infiles[0][2]
 
-# should replace this with commandline statement to make this simpler to understand, same for salmon
+	# check for paired end files and overwrite fastqfile if True
+    if fastqfile.endswith(".fastq.1.gz"):
+    	bn = P.snip(fastqfile, ".fastq.1.gz")
+    	infile1 = "%s.fastq.1.gz" % bn
+    	infile2 = "%s.fastq.2.gz" % bn
+    	if not os.path.exists(infile2):
+    		raise ValueError(
+    			"can not find paired ended file "
+    			"'%s' for '%s'" % (infile2, infile))
+    	fastqfile = infile1 + " " + infile2
 
-    transcript_outfile, gene_outfile = outfiles
-    Quantifier = rnaseq.KallistoQuantifier(
-        infile=fastqfile,
-        transcript_outfile=transcript_outfile,
-        gene_outfile=gene_outfile,
-        annotations=index,
-        job_threads=PARAMS["kallisto_threads"],
-        job_memory=PARAMS["kallisto_memory"],
-        options=PARAMS["kallisto_options"],
-        bootstrap=PARAMS["kallisto_bootstrap"],
-        fragment_length=PARAMS["kallisto_fragment_length"],
-        fragment_sd=PARAMS["kallisto_fragment_sd"],
-        transcript2geneMap=transcript2geneMap)
+    outfile = outfiles[0].replace("abundance.h5","")
+    statement = """kallisto quant -i %(index)s %(kallisto_options)s -o %(outfile)s %(fastqfile)s"""
+    P.run(statement)
 
-    Quantifier.run_all()
+###################################################
+###################################################
+# Create quantification targets
+###################################################
+
+@collate(run_kallisto,
+         regex("(\S+).dir/(\S+)/abundance.h5"),
+         [r"\1.dir/counts.tsv.gz"])
+def merge_tpm(infiles, outfile):
+    ''' merge counts across all samples - this is not relly used
+        within the downstream tasks of the pipeline and is here
+        for reference only'''
+
+    transcript_infiles = [x[1] for x in infiles]
+
+    final_df = pd.DataFrame()
+
+    for infile in transcript_infiles:
+    	path = os.path.normpath(infile)
+    	folder_name = path.split("/")[1]
+
+    	tmp_df = pd.read_table(infile, sep="\t", index_col=0)
+    	# Only select tpm values and rename with name of folder
+    	tmp_df = tmp_df[["tpm"]]
+    	tmp_df.columns = [folder_name]
+    	final_df = final_df.merge(tmp_df, how="outer",  left_index=True, right_index=True)
+    final_df = final_df.round()
+    final_df.sort_index(inplace=True)
+    final_df.to_csv(outfile[0], sep="\t", compression="gzip")
 
 
-@follows(mkdir("salmon.dir"))
-@collate(SEQUENCEFILES,
-         SEQUENCEFILES_REGEX,
-         add_inputs(buildSalmonIndex, getTranscript2GeneMap),
-         SEQUENCEFILES_SALMON_OUTPUT)
-def runSalmon(infiles, outfiles):
-    '''
-    Computes read counts across transcripts and genes based on a fastq
-    file and an indexed transcriptome using Salmon.
-    Runs the salmon "quant" function across transcripts with the specified
-    options.  Read counts across genes are counted as the total in all
-    transcripts of that gene (based on the getTranscript2GeneMap table)
-    Parameters
-    ----------
-    infiles: list
-        list with three components
-        0 - list of strings - paths to fastq files to merge then quantify
-        across using sailfish
-        1 - string - path to sailfish index file
-        2 - string - path to table mapping transcripts to genes
-    salmon_threads: int
-       :term: `PARAMS` the number of threads for salmon
-    salmon_memory: str
-       :term: `PARAMS` the job memory for salmon
-    salmon_options: str
-       :term: `PARAMS` string to append to the salmon quant command to
-       provide specific
-       options, see http://sailfish.readthedocs.io/en/master/salmon.html
-    salmon_bootstrap: int
-       :term: `PARAMS` number of bootstrap samples to run.
-       Note, you need to bootstrap for differential expression with sleuth
-       if there are no technical replicates. If you only need point estimates,
-       set to 1.
-    salmon_libtype: str
-       :term: `PARAMS` salmon library type
-       as for sailfish - use
-       http://sailfish.readthedocs.io/en/master/library_type.html#fraglibtype
-    outfiles: list
-       paths to output files for transcripts and genes
-    '''
-    fastqfile = [x[0] for x in infiles]
-    index = infiles[0][1]
-    transcript2geneMap = infiles[0][2]
+###################################################
+# Differential Expression
+###################################################
 
-    transcript_outfile, gene_outfile = outfiles
-    Quantifier = rnaseq.SalmonQuantifier(
-        infile=fastqfile,
-        transcript_outfile=transcript_outfile,
-        gene_outfile=gene_outfile,
-        annotations=index,
-        job_threads=PARAMS["salmon_threads"],
-        job_memory=PARAMS["salmon_memory"],
-        options=PARAMS["salmon_options"],
-        bootstrap=PARAMS["salmon_bootstrap"],
-        libtype=PARAMS['salmon_libtype'],
-        transcript2geneMap=transcript2geneMap)
 
-    Quantifier.run_all()
+@mkdir("DEresults.dir/deseq2")
+@merge(run_kallisto,
+         ["DESEq2.dir/counts.tsv.gz"])
+def run_deseq2(infiles, outfile):
+    ''' run DESeq2 to identify differentially expression'''
 
+  
+    statement = '''Rscript '''
+    P.run(statement)
+
+
+
+@mkdir("DEresults.dir/sleuth")
+@merge(run_kallisto,
+         ["DESEq2.dir/counts.tsv.gz"])
+def runSleuth(infiles, outfile):
+    ''' run sleuth to identify differentially expression'''
+
+    statement = ''''''
+
+    P.run(statement)
+
+
+
+
+###################################################
+# target functions for code execution             #
+###################################################
 
 def full():
     ''' dummy task for full ruffus tasks'''
