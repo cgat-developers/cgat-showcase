@@ -301,7 +301,7 @@ def run_kallisto(infiles, outfiles):
          [r"\1.dir/counts.tsv.gz"])
 def merge_tpm(infiles, outfile):
     ''' merge counts across all samples - this is not relly used
-        within the downstream tasks of the pipeline and is there
+        within the downstream tasks of the pipeline and is here
         for reference only'''
 
     transcript_infiles = [x[1] for x in infiles]
@@ -326,299 +326,31 @@ def merge_tpm(infiles, outfile):
 # Differential Expression
 ###################################################
 
-Sample = tracks.AutoSample
-DESIGNS = tracks.Tracks(Sample).loadFromDirectory(
-    glob.glob("design*.tsv"), "design(\S+).tsv")
 
 @mkdir("DEresults.dir/deseq2")
-@product(merge_tpm,
-         formatter(".*/(?P<QUANTIFIER>\S+).dir/transcripts.tsv.gz"),
-         ["design%s.tsv" % x.asFile() for x in DESIGNS],
-         formatter(".*/design(?P<DESIGN>\S+).tsv$"),
-         ["DEresults.dir/deseq2/{QUANTIFIER[0][0]}_{DESIGN[1][0]}_transcripts_results.tsv",
-          "DEresults.dir/deseq2/{QUANTIFIER[0][0]}_{DESIGN[1][0]}_genes_results.tsv"],
-         "{DESIGN[1][0]}")
-def runDESeq2(infiles, outfiles, design_name):
-    ''' run DESeq2 to identify differentially expression transcripts/genes'''
+@merge(run_kallisto,
+         ["DESEq2.dir/counts.tsv.gz"])
+def run_deseq2(infiles, outfile):
+    ''' run DESeq2 to identify differentially expression'''
 
-    design_name = design_name.lower()
-    counts, design = infiles
-    transcripts, genes = counts
-    transcript_out, gene_out = outfiles
-
-    transcript_prefix = P.snip(transcript_out, ".tsv")
-    transcript_log = transcript_prefix + ".log"
-
-    gene_prefix = P.snip(gene_out, ".tsv")
-    gene_log = gene_prefix + ".log"
-
-    model = PARAMS.get('deseq2_model%s' % design_name, None)
-    contrast = PARAMS.get('deseq2_contrast%s' % design_name, None)
-    refgroup = PARAMS.get('deseq2_refgroup%s' % design_name, None)
-
-    if model is None:
-        raise ValueError("deseq2_model{} is not specified".format(
-            design_name))
-    if contrast is None:
-        raise ValueError("deseq2_contrast{} is not specified".format(
-            design_name))
-    if refgroup is None:
-        raise ValueError("deseq2_refgroup{} is not specified".format(
-            design_name))
-# in future when it is a package run as: python -m pipelines.tasks.counts2table
-    statement = '''
-    python ../cgat-showcase/pipelines/tasks/counts2table.py
-    --tag-tsv-file=%(transcripts)s
-    --design-tsv-file=%(design)s
-    --method=deseq2
-    --de-test=%(deseq2_detest)s
-    --output-filename-pattern=%(transcript_prefix)s
-    --model=%(model)s
-    --contrast=%(contrast)s
-    --reference-group=%(refgroup)s
-    --fdr=%(deseq2_fdr)s
-    --log=%(transcript_log)s
-    -v 0
-    > %(transcript_out)s;
-    '''
+  
+    statement = '''Rscript '''
     P.run(statement)
 
-    statement = '''
-    python ../cgat-showcase/pipelines/tasks/counts2table.py
-    --tag-tsv-file=%(genes)s
-    --design-tsv-file=%(design)s
-    --method=deseq2
-    --de-test=%(deseq2_detest)s
-    --output-filename-pattern=%(gene_prefix)s
-    --model=%(model)s
-    --contrast=%(contrast)s
-    --reference-group=%(refgroup)s
-    --fdr=%(deseq2_fdr)s
-    --log=%(gene_log)s
-    -v 0
-    > %(gene_out)s;
-    '''
-
-    P.run(statement)
 
 
 @mkdir("DEresults.dir/sleuth")
-@product(merge_tpm,
-         formatter(
-             ".*/(?P<QUANTIFIER>(kallisto|salmon|sailfish)).dir/transcripts.tsv.gz"),
-         ["design%s.tsv" % x.asFile() for x in DESIGNS],
-         formatter(".*/design(?P<DESIGN>\S+).tsv$"),
-         ["DEresults.dir/sleuth/{QUANTIFIER[0][0]}_{DESIGN[1][0]}_transcripts_results.tsv",
-          "DEresults.dir/sleuth/{QUANTIFIER[0][0]}_{DESIGN[1][0]}_genes_results.tsv"],
-         "{DESIGN[1][0]}",
-         "{QUANTIFIER[0][0]}")
-def runSleuth(infiles, outfiles, design_name, quantifier):
-    ''' run sleuth to identify differentially expression transcripts/genes'''
+@merge(run_kallisto,
+         ["DESEq2.dir/counts.tsv.gz"])
+def runSleuth(infiles, outfile):
+    ''' run sleuth to identify differentially expression'''
 
-    design_name = design_name.lower()
-    counts, design = infiles
-    transcripts, genes = counts
-    transcript_out, gene_out = outfiles
-
-    transcript_prefix = P.snip(transcript_out, ".tsv")
-    transcript_log = transcript_prefix + ".log"
-
-    gene_prefix = P.snip(gene_out, ".tsv")
-    gene_log = gene_prefix + ".log"
-
-    model = PARAMS['sleuth_model%s' % design_name]
-    E.info(model)
-    reduced_model = PARAMS['sleuth_reduced_model%s' % design_name]
-
-    contrast = PARAMS['sleuth_contrast%s' % design_name]
-    refgroup = PARAMS['sleuth_refgroup%s' % design_name]
-    detest = PARAMS['sleuth_detest']
-    transcripts = os.path.join("geneset.dir",
-                               P.snip(PARAMS['geneset'], ".gtf.gz") + ".fa")
-
-    # to estimate sleuth memory, we need to know the number of
-    # samples, transcripts and boostraps
-    number_transcripts = 0
-    with iotools.open_file(transcripts, "r") as inf:
-        for line in inf:
-            if line.startswith(">"):
-                number_transcripts += 1
-
-    Design = Expression.ExperimentalDesign("design%s.tsv" % design_name)
-    number_samples = sum(Design.table['include'])
-
-    job_memory = rnaseq.estimateSleuthMemory(
-        PARAMS["%(quantifier)s_bootstrap" % locals()],
-        number_samples, number_transcripts)
-
-    statement = '''
-    python -m cgatpipelines.tasks.counts2table
-    --design-tsv-file=%(design)s
-    --output-filename-pattern=%(transcript_prefix)s
-    --log=%(transcript_log)s
-    --method=sleuth
-    --fdr=%(sleuth_fdr)s
-    --model=%(model)s
-    --contrast=%(contrast)s
-    --sleuth-counts-dir=%(quantifier)s.dir
-    --reference-group=%(refgroup)s
-    --de-test=%(detest)s
-    '''
-    if detest == "lrt":
-        statement += '''
-        --reduced-model=%(reduced_model)s
-        '''
-    statement += '''
-    -v 0
-    >%(transcript_out)s
-    '''
+    statement = ''''''
 
     P.run(statement)
 
-    if PARAMS['sleuth_genewise']:
-
-        assert PARAMS['sleuth_gene_biomart'], (
-            "Must provide a biomart (see pipeline.yml)")
-
-        # gene-wise sleuth seems to be even more memory hungry!
-        # Use 2 * transcript memory estimate
-        job_memory = rnaseq.estimateSleuthMemory(
-            PARAMS["%(quantifier)s_bootstrap" % locals()],
-            2 * number_samples, number_transcripts)
-
-        statement = '''
-        python -m cgatpipelines.tasks.counts2table
-        --design-tsv-file=%(design)s
-        --output-filename-pattern=%(gene_prefix)s
-        --log=%(gene_log)s
-        --method=sleuth
-        --fdr=%(sleuth_fdr)s
-        --model=%(model)s
-        --contrast=%(contrast)s
-        --sleuth-genewise
-        --sleuth-counts-dir=%(quantifier)s.dir
-        --reference-group=%(refgroup)s
-        --gene-biomart=%(sleuth_gene_biomart)s
-        --de-test=%(detest)s
-        '''
-        if detest == "lrt":
-            statement += '''
-            --reduced-model=%(reduced_model)s
-            '''
-        statement += '''
-        -v 0
-        >%(transcript_out)s
-        '''
-
-        P.run(statement)
-
-@mkdir("DEresults.dir/deseq2")
-@transform(merge_tpm,
-           regex("(\S+).dir/transcripts.tsv.gz"),
-           [r"DEresults.dir/deseq2/\1_normalised_transcripts_expression.tsv.gz",
-            r"DEresults.dir/deseq2/\1_normalised_genes_expression.tsv.gz"])
-def getDESeqNormExp(infiles, outfiles):
-    ''' Use the Deseq2 size factors method to obtain normalised
-    expression values for summary plots '''
-    # currently DESeq expression factors is not working
-    # to normalise the expression values. In some workflows
-    # the columns produce infinity values. Have defaulted to
-    # total column until issue is identified
-
-    transcripts_inf, genes_inf = infiles
-    transcripts_outf, genes_outf = outfiles
-
-    normalisation_method = "total-column"
-
-    rnaseq.normaliseCounts(
-        transcripts_inf, transcripts_outf, normalisation_method)
-    rnaseq.normaliseCounts(
-        genes_inf, genes_outf, normalisation_method)
 
 
-@mkdir("DEresults.dir/sleuth")
-@collate(
-    run_kallisto,
-    formatter(
-        "(?P<QUANTIFIER>(kallisto|salmon|sailfish)).dir/(\S+)/transcripts.tsv.gz"),
-    [r"DEresults.dir/sleuth/{QUANTIFIER[0]}_normalised_transcripts_expression.tsv.gz",
-     r"DEresults.dir/sleuth/{QUANTIFIER[0]}_normalised_genes_expression.tsv.gz"],
-    r"{QUANTIFIER[0]}")
-def getSleuthNormExp(infiles, outfiles, quantifier):
-    ''' get the Normalised expression from the quantification tools
-    which we will run sleuth from'''
-
-    t2gMap = infiles[0][1]
-    transcript_infiles = [x[0][0] for x in infiles]
-    transcripts_outf, genes_outf = outfiles
-
-    if quantifier == "kallisto":
-        basename = "abundance.h5.tsv"
-        column = "tpm"
-    else:
-        raise ValueError("using unknown quantifier!")
-
-    rnaseq.getAlignmentFreeNormExp(
-        transcript_infiles, basename, column,
-        transcripts_outf, genes_outf, t2gMap)
-
-
-# Define the task for differential expression and normalisation
-DETARGETS = []
-NORMTARGETS = []
-mapToDETargets = {'deseq2': (runDESeq2,),
-                  'sleuth': (runSleuth,)}
-
-mapToNormTargets = {'deseq2': (getDESeqNormExp, ),
-                    'sleuth': (getSleuthNormExp,)}
-
-for x in P.as_list(PARAMS["de_tools"]):
-    DETARGETS.extend(mapToDETargets[x])
-    if x in mapToNormTargets:
-        NORMTARGETS.extend(mapToNormTargets[x])
-
-
-@follows(*DETARGETS)
-def differentialExpression():
-    ''' dummy task to define upstream differential expression tasks'''
-
-
-@follows(*NORMTARGETS)
-def NormaliseExpression():
-    ''' dummy task to define upstream normalisation tasks'''
-
-
-###################################################
-# Summary plots
-###################################################
-
-@mkdir("summary_plots")
-@product(NORMTARGETS,
-         formatter(
-             "DEresults.dir/(?P<DETOOL>\S+)/(?P<QUANTIFIER>\S+)_normalised_transcripts_expression.tsv.gz"),
-         ["design%s.tsv" % x.asFile() for x in DESIGNS],
-         formatter(".*/design(?P<DESIGN>\S+).tsv$"),
-         ["summary_plots/{DETOOL[0][0]}_{QUANTIFIER[0][0]}_{DESIGN[1][0]}_transcripts_plots.log",
-          "summary_plots/{DETOOL[0][0]}_{QUANTIFIER[0][0]}_{DESIGN[1][0]}_genes_plots.log"])
-def expressionSummaryPlots(infiles, logfiles):
-    ''' make summary plots for expression values for each design file'''
-
-    expression_infs, design_inf = infiles
-    transcript_inf, gene_inf = expression_infs
-    transcript_log, gene_log = logfiles
-
-    job_memory = "10G"
-
-    if not os.path.exists(os.path.dirname(gene_log)):
-        os.mkdir(os.path.dirname(gene_log))
-
-    rnaseq.makeExpressionSummaryPlots(
-        transcript_inf, design_inf, transcript_log, submit=True,
-        job_memory=job_memory)
-
-    rnaseq.makeExpressionSummaryPlots(
-        gene_inf, design_inf, gene_log, submit=True,
-        job_memory=job_memory)
 
 ###################################################
 # target functions for code execution             #
