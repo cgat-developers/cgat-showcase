@@ -110,19 +110,11 @@ from ruffus.combinatorics import *
 
 import sys
 import os
-import re
-import glob
 import pandas as pd
-import sqlite3
 import cgat.GTF as GTF
 import cgatcore.iotools as iotools
 import cgatcore.experiment as E
 from cgatcore import pipeline as P
-
-import tasks.mapping as mapping
-import tasks.rnaseq as rnaseq
-import tasks.tracks as tracks
-
 
 # load options from the config file
 P.get_parameters(
