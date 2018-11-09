@@ -67,7 +67,9 @@ setup(
     url="https://github.com/cgat-developers/cgat-core",
     # package contents
     packages=cgat_packages,
-    package_dir=cgat_package_dirs, # ask andreas about package dirs????
+    package_data={'cgatshowcase':['cgatshowcase/R/*.R']},
+    include_package_dir=True,
+    package_dir=cgat_package_dirs,
     include_package_data=True,
     # other options
     zip_safe=False,

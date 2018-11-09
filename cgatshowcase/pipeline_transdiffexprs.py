@@ -315,14 +315,16 @@ def merge_tpm(infiles, outfile):
 def run_deseq2(infiles, outfile):
     ''' run DESeq2 to identify differentially expression'''
 
+    R_ROOT = os.path.join(os.path.dirname(__file__), "R")
+
     if PARAMS["deseq_ltr"]:
 
-        statement = '''Rscript ../cgat-developers-v5/cgat-showcase/R/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
+        statement = '''Rscript %(R_ROOT)s/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
         P.run(statement)
 
     elif PARAMS['deseq_wald']:
         
-        statement = '''Rscript ../cgat-developers-v5/cgat-showcase/R/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
+        statement = '''Rscript  %(R_ROOT)s/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
         P.run(statement)
 
 ###################################################
