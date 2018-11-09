@@ -4,11 +4,11 @@
 CGAT-showcase documentation!
 ============================
 
-.. image:: https://readthedocs.org/projects/cgat-core/badge/?version=latest
-    :target: http://cgat-core.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/cgat-showcase/badge/?version=latest
+    :target: http://cgat-showcase.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-.. image:: https://img.shields.io/travis/cgat-developers/cgat-core.svg
+.. image:: https://img.shields.io/travis/cgat-developers/cgat-showcase.svg
     :alt: Travis
 
 .. image:: https://img.shields.io/twitter/follow/CGAT_Oxford.svg?style=social&logo=twitter&label=Follow
