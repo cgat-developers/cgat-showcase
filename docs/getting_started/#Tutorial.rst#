@@ -1,0 +1,36 @@
+.. _getting_started-Tutorial:
+
+
+=============================
+Running a pipeline - Tutorial
+=============================
+
+Before beginning this tutorial plase make sure you have cgat-showcase installed correctly, please see here (see :ref:`getting_started-Installation`) for instructions.
+
+As a tutorial example we have written a showcase example of how you can build robust and scalable pipelines
+written in python. For this toy example we have written a workflow that performs pseudocounting using kallisto and differential expression
+analysis using deseq. Two reports are then generated, one using `MultiQC <https://multiqc.info/>` and another written in
+`Rmarkdown <https://rmarkdown.rstudio.com/>`. However, because of the flexible nature of our workflow management system,
+any reporting strategy can be implimented.
+
+Tutorial
+--------
+
+**1.** First download the tutorial data::
+
+   mkdir showcase
+   cd showcase
+   wget 
+   tar -zxvf 
+
+**2.** Next we will generate a configuration yml file so the pipeline output can be modified::
+
+   cgatshowcase transdiffexpres config
+
+or you can alternatively call the workflow file directly::
+
+   python /path/to/file/pipeline_transdiffexpres.py config
+
+This will generate a yml file containing the configuration parameters than can be used to modify
+the output of the pip
+**3.** 
