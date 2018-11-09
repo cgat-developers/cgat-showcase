@@ -15,7 +15,7 @@ Installation using conda
 ------------------------
 
 The most convinient way to use our code is to install the software using conda. First you will need to install
-conda using `miniconda <https://conda.io/miniconda.html>` or `anaconda <https://www.anaconda.com/download/#linux>` and following the instructions `here <https://conda.io/docs/user-guide/install/linux.html>`. (we recomend miniconda rather than anaconda) 
+conda using `miniconda <https://conda.io/miniconda.html>`_ or `anaconda <https://www.anaconda.com/download/#linux>`_ and following the instructions `here <https://conda.io/docs/user-guide/install/linux.html>`_. (we recomend miniconda rather than anaconda) 
 
 Once you have conda installed then to install cgat-showcase please do the following:
 
@@ -27,7 +27,7 @@ This should install all of the dependancies and you should be read to proceded t
 Manual installation
 -------------------
 
-To obtain the latest code, check it out from the public git_ repository and activate it::
+To obtain the latest code, check it out from the public git repository and activate it::
 
    git clone https://github.com/cgat-developers/cgat-core.git
    cd cgat-core

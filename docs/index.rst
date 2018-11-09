@@ -24,7 +24,7 @@ cgat-core allows you to quickly build both simple and complex reproducible pipel
 
 CGAT-core is  a set of libraries and helper functions used to enable researchers
 to design and build computational workflows for the analysis of large-scale data-analysis. Access to code is
-through `github <https://github.com/cgat-developers/cgat-showcase>` and documentation can be accessed `here <https://cgat-core.readthedocs.io/en/latest/>`.
+through `github <https://github.com/cgat-developers/cgat-showcase>`_ and documentation can be accessed `here <https://cgat-core.readthedocs.io/en/latest/>`_.
 
 Used in combination with CGAT-apps, we have deomonstrated the functionality of our
 flexible implementation using a set of well documented, easy to install and easy to use workflows, which we descibe in this documentation.
