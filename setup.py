@@ -16,6 +16,20 @@ with open("README.md", "r") as fh:
 
 ########################################################################
 ########################################################################
+# Import setuptools
+# Use existing setuptools, otherwise try ez_setup.
+try:
+    import setuptools
+except ImportError:
+    # try to get via ez_setup
+    # ez_setup did not work on all machines tested as
+    # it uses curl with https protocol, which is not
+    # enabled in ScientificLinux
+    import ez_setup
+    ez_setup.use_setuptools()
+
+########################################################################
+########################################################################
 IS_OSX = sys.platform == 'darwin'
 
 ########################################################################
@@ -42,7 +56,6 @@ cgat_package_dirs = {'cgatshowcase': 'cgatshowcase'}
 ##########################################################
 # Classifiers
 classifiers = """
-Development Status :: 3 - Alpha
 Intended Audience :: Science/Research
 Intended Audience :: Developers
 License :: OSI Approved
