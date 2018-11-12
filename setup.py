@@ -35,7 +35,7 @@ major, minor1, minor2, s, tmp = sys.version_info
 if major < 3:
     raise SystemExit("""cgat-showcase requires Python 3 or later.""")
 
-cgat_packages = find_packages()
+
 cgat_package_dirs = {'cgatshowcase': 'cgatshowcase'}
 
 ##########################################################
@@ -66,14 +66,17 @@ setup(
     keywords="computational genomics",
     long_description=long_description,
     classifiers=[_f for _f in classifiers.split("\n") if _f],
-    url="https://github.com/cgat-developers/cgat-core",
+    url="https://github.com/cgat-developers/cgat-showcase",
     # package contents
-    packages=cgat_packages,
+    packages=find_packages(),
     package_data={'cgatshowcase':['cgatshowcase/R/*.R']},
-    include_package_dir=True,
     package_dir=cgat_package_dirs,
     include_package_data=True,
+    entry_points={
+        'console_scripts': ['cgatshowcase = cgatshowcase.entry:main']
+    },
     # other options
     zip_safe=False,
     test_suite="tests",
+    
 )

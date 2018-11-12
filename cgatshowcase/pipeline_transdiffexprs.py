@@ -328,7 +328,7 @@ def run_deseq2(infiles, outfile):
 @follows(run_deseq2)
 def run_multiqc_report():
     '''This will generate a mutiqc report '''
-        statement = (
+    statement = (
         "export LC_ALL=en_GB.UTF-8 && "
         "export LANG=en_GB.UTF-8 && "
         "multiqc . -f && "
