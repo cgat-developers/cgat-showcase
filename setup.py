@@ -42,11 +42,11 @@ cgat_package_dirs = {'cgatshowcase': 'cgatshowcase'}
 ##########################################################
 # Classifiers
 classifiers = """
-Development Status :: 0 - Beta
+Development Status :: 3 - Alpha
 Intended Audience :: Science/Research
 Intended Audience :: Developers
-License :: OSI Approved :: MIT Licence
-Programming Language :: Python :: 3
+License :: OSI Approved
+Programming Language :: Python
 Topic :: Software Development
 Topic :: Scientific/Engineering
 Operating System :: POSIX
