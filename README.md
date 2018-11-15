@@ -8,6 +8,7 @@ with kallisto and differential expression using deseq2. It can be ran locally or
 Documentation on how to run this pipeline can be found `here <https://cgat-showcase.readthedocs.io/en/latest/>`_ and documentation on how
 to build a workflow from scratch can be found `here <https://cgat-core.readthedocs.io/en/latest/defining_workflow/Tutorial.html>`_ .
 
+
 ============
 Installation
 ============
