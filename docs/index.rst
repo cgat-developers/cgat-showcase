@@ -63,6 +63,17 @@ Support
    getting_started/Writing_workflow.rst
    getting_started/Tutorial.rst
 
+
+.. toctree::
+   :caption: Build a workflow
+   :name: build_workflow
+   :maxdepth: 1
+   :hidden:
+
+   build_workflow/writing_workflow.rst
+   build_workflow/packaging.rst
+   build_workflow/conda_build.rst
+
 .. toctree::
    :caption: Project Info
    :name: project-info

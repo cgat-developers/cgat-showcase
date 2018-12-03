@@ -15,10 +15,10 @@ The following sections describe how to install the cgat-showcase pipeline.
 
 We recommend installing using conda and the steps are described below::
 
-   conda install -c cgat cgatshowcase
+   `conda install -c cgat cgatshowcase`
 
 Alternatively, the pipeline can be installed using pip::
 
-   pip install cgatshowcase
+   `pip install cgatshowcase`
 
 However, you will require certain software to run the pipeline. More detail on installation can be found on the [Installation](https://cgat-showcase.readthedocs.io/en/latest/getting_started/Installation.html) documentation.
