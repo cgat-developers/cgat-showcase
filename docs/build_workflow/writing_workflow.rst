@@ -160,3 +160,14 @@ The configuration file then needs to be written so that the yml parser can pick 
 
 The kmer will then have the value of 31 and can be passed into then pipeline. This is accessed within the pipeline as PARAMS['kallisto_kmer'] and will have the value 31.
 
+6. generating a report
+----------------------
+
+In order to present our results in a visually appealing manner, we use multiQC resports to display generic sequencing metrics and rmarkdown (or ipython if you prefer) for generating
+bespoke reports.
+
+In order to write a report you will need to generate an rmarkdown document folder as follows::
+
+   mkdir cgat-showcase/cgatshowcase/pipeline_docs/pipeline_transdiffexprs/R_report
+
+
