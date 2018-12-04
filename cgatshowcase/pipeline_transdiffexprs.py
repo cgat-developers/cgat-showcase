@@ -193,23 +193,20 @@ def buildKallistoIndex(infile, outfile):
 # Run alignment free quantification - kallisto
 #################################################
 
-DATADIR = "."
 
 SEQUENCESUFFIXES = ("*.fastq.1.gz",
                     "*.fastq.gz")
-SEQUENCEFILES = tuple([os.path.join(DATADIR, suffix_name)
-                       for suffix_name in SEQUENCESUFFIXES])
+SEQUENCEFILES = tuple([suffix_name for suffix_name in SEQUENCESUFFIXES])
 
 SEQUENCEFILES_REGEX = regex(
         "(\S+).(fastq.1.gz|fastq.gz)")
 
 
-@follows(mkdir("kallisto.dir"))
-@collate(SEQUENCEFILES,
-         SEQUENCEFILES_REGEX,
-         add_inputs(buildKallistoIndex),
-         [r"kallisto.dir/\1/abundance.h5",r"kallisto.dir/\1/abundance.tsv"])
-def run_kallisto(infiles, outfiles):
+@transform(SEQUENCEFILES,
+           SEQUENCEFILES_REGEX,
+           add_inputs(buildKallistoIndex),
+           r"kallisto.dir/\1/abundance.h5")
+def runKallisto(infiles, outfile):
     '''
     Computes read counts across transcripts and genes based on a fastq
     file and an indexed transcriptome using Kallisto.
@@ -247,10 +244,10 @@ def run_kallisto(infiles, outfiles):
        paths to output files for transcripts and genes
     '''
 
-    fastqfile = infiles[0][0]
-    index = infiles[0][1]
+    fastqfile = infiles[0]
+    index = infiles[1]
 
-	# check for paired end files and overwrite fastqfile if True
+    # check for paired end files and overwrite fastqfile if True
     if fastqfile.endswith(".fastq.1.gz"):
     	bn = P.snip(fastqfile, ".fastq.1.gz")
     	infile1 = "%s.fastq.1.gz" % bn
@@ -261,39 +258,19 @@ def run_kallisto(infiles, outfiles):
     			"'%s' for '%s'" % (infile2, infile))
     	fastqfile = infile1 + " " + infile2
 
-    outfile = outfiles[0].replace("abundance.h5","")
-    statement = """kallisto quant -i %(index)s %(kallisto_options)s -o %(outfile)s %(fastqfile)s"""
+    outfile = outfile.replace("abundance.h5","")
+
+    statement = '''kallisto quant
+                   -i %(index)s
+                   -t %(kallisto_threads)s
+                   %(kallisto_options)s
+                   -o %(outfile)s
+                   %(fastqfile)s
+                   &> %(outfile)s/kallisto.log
+                   > %(outfile)s/kallisto.sdtout''' % locals()
+
+    job_threads = 1
     P.run(statement)
-
-###################################################
-###################################################
-# Create quantification targets
-###################################################
-
-@collate(run_kallisto,
-         regex("(\S+).dir/(\S+)/abundance.h5"),
-         [r"\1.dir/counts.tsv.gz"])
-def merge_tpm(infiles, outfile):
-    ''' merge counts across all samples - this is not relly used
-        within the downstream tasks of the pipeline and is here
-        for reference only'''
-
-    transcript_infiles = [x[1] for x in infiles]
-
-    final_df = pd.DataFrame()
-
-    for infile in transcript_infiles:
-    	path = os.path.normpath(infile)
-    	folder_name = path.split("/")[1]
-
-    	tmp_df = pd.read_table(infile, sep="\t", index_col=0)
-    	# Only select tpm values and rename with name of folder
-    	tmp_df = tmp_df[["tpm"]]
-    	tmp_df.columns = [folder_name]
-    	final_df = final_df.merge(tmp_df, how="outer",  left_index=True, right_index=True)
-    final_df = final_df.round()
-    final_df.sort_index(inplace=True)
-    final_df.to_csv(outfile[0], sep="\t", compression="gzip")
 
 
 ###################################################
@@ -301,23 +278,32 @@ def merge_tpm(infiles, outfile):
 ###################################################
 
 
-@mkdir("DEresults.dir/deseq2")
-@merge(run_kallisto,
-         ["DESEq2.dir/counts.tsv.gz"])
+@mkdir("DEresults.dir")
+@merge(runKallisto,
+       "DEresults.dir/counts.csv")
 def run_deseq2(infiles, outfile):
     ''' run DESeq2 to identify differentially expression'''
 
     R_ROOT = os.path.join(os.path.dirname(__file__), "R")
 
-    if PARAMS["deseq_ltr"]:
+    if PARAMS["deseq2_detest"] == "lrt":
 
-        statement = '''Rscript %(R_ROOT)s/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
-        P.run(statement)
+        statement = '''Rscript %(R_ROOT)s/DESeq2_lrt.R
+                       --design=design.tsv
+                       --contrast=%(deseq2_contrast)s
+                       --refgroup=%(deseq2_refgroup)s
+                       --fdr=%(deseq2_fdr)s'''
 
-    elif PARAMS['deseq_wald']:
+    elif PARAMS['deseq2_detest'] == "wald":
         
-        statement = '''Rscript  %(R_ROOT)s/DESeq2_lrt.R --design=design_mug.tsv --contrast=dmso --fdr=0.01'''
-        P.run(statement)
+        statement = '''Rscript  %(R_ROOT)s/DESeq2_wald.R
+                       --design=design.tsv
+                       --contrast=%(deseq2_contrast)s
+                       --refgroup=%(deseq2_refgroup)s
+                       --fdr=%(deseq2_fdr)s'''
+
+    P.run(statement)
+
 
 ###################################################
 # Generate a report
