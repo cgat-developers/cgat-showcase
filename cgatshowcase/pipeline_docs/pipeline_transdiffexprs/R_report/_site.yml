@@ -1,0 +1,36 @@
+name: pipeline_transdiffexprs
+navbar:
+  title: Differential expression analysis
+  right:
+  - text: Home
+    href: index.html
+  - text: Clustering
+    icon: fa-link
+    href: Clustering.html
+  - text: Differential expression
+    icon: fa-link
+    href: DE.html
+  - text: Enrichment
+    icon: fa-link
+    href: Enrichment.html
+
+output:
+  html_document:
+    css: style.css
+    fig_caption: yes
+    theme: cerulean
+    highlight: textmate
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    lib_dir: site_libs
+    self_contained: no
+exclude:
+- rds
+- counts
+- expdata
+- '*.R'
+output_dir: Final_report
+

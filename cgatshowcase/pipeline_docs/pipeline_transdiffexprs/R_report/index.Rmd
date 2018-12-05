@@ -1,0 +1,11 @@
+---
+title: "Introduction"
+output: html_document
+---
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+The following website highlights our preference for writing dynamic Rmarkdown reports for visualising the output of our pipelines. The value of writing Rmarkdown us that once the pipeline has generated a basic report then each of the Rmarkdown pages can be re-ran and modified towards the indivdual experiment.
+
+Our basic workflow for analysis of pseudoalignment data is based off the [DESeq2 vignette](https://www.bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html). We employ clustering to visualise the quality of the data and then perform differential expression. Following this, we then perform enrichment analysis using the [XGR package](http://galahad.well.ox.ac.uk/XGR/XGR_user_manual.html).
+
+
