@@ -1,0 +1,68 @@
+---
+title: "Enrichment"
+output: html_document
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(clusterProfiler)
+library(DT)
+```
+
+
+## GO analysis total
+
+Functional Profile of a gene set at specific GO level. Given a vector of genes, this function will return the GO profile at a specific level.
+
+```{r, warning=FALSE, message=FALSE}
+sig <- read.csv("results/output_sig.csv")
+
+eg <- bitr(sig$SYMBOL, fromType = "SYMBOL", toType = c("ENTREZID", "ENSEMBL"), OrgDb = "org.Hs.eg.db")
+
+ggo <- groupGO(gene = as.vector(eg$ENTREZID),
+               OrgDb = 'org.Hs.eg.db',
+               ont = "BP",
+               level = 2,
+               readable = TRUE)
+datatable(head(as.data.frame(ggo)))
+```
+
+## Bar plot 
+```{r}
+barplot(ggo, drop=TRUE)
+```
+
+
+# GO over-representation test
+
+GO Enrichment Analysis of a gene set. Given a vector of genes, this function will return the enrichment GO categories after FDR control.
+
+```{r, warning=FALSE, message=FALSE}
+background <- read.csv("results/output_res.csv") 
+universe <- bitr(background$SYMBOL, fromType = "SYMBOL", toType = c("ENTREZID", "ENSEMBL"), OrgDb = "org.Hs.eg.db")
+
+ego <-enrichGO(eg$ENTREZID, 'org.Hs.eg.db', keyType = "ENTREZID", ont = "BP",
+      pvalueCutoff = 0.05, pAdjustMethod = "BH", universe$ENTREZID,
+      qvalueCutoff = 0.2, minGSSize = 10, maxGSSize = 500,
+      readable = TRUE)
+
+datatable(head(ego))
+```
+
+## Bar plot 
+```{r}
+barplot(ego, drop=TRUE)
+```
+
+# Dotplot
+
+```{r}
+dotplot(ego)
+```
+
+# cnetplot plot
+
+In order to consider the potentially biological complexities in which a gene may belong to multiple annotation categories and provide information of numeric changes if available.
+
+```{r}
+cnetplot(ego,  showCategory = 5,categorySize = "pvalue")
+```

@@ -11,6 +11,8 @@ option_list <- list(
 					help="To run DESEq2 you need to specify the location of a design.tsv file according to the pipeline documentation"),
 					make_option(c("--contrast"), default="must_specify",
 					help="must specify a contrast in the pipeline.yml file"),
+					make_option(c("--refgroup"), default="must_specify",
+					help="must specify a reference group to compare against in the pipeline.yml file"),
 					make_option(c("--fdr"), default=0.05,
 					help="set an optional fdr, will default to 0.05"))
 
@@ -44,13 +46,16 @@ dds <- DESeqDataSetFromTximport(txi.kallisto, design, ~ group)
 dds = suppressMessages(
   DESeq(dds, test="Wald", fitType="parametric"))
 
-dds$group <- relevel(dds$group, ref = opt$contrast)
+dds$group <- relevel(dds$group, ref = opt$refgroup)
 
 
 
 res = suppressMessages(results(dds))
 res = as.data.frame(res)
 
+write.csv(res, file="DEresults.dir/counts.csv")
+
+saveRDS(dds, "DEresults.dir/dds.rds")
 
 dir.create("plots.dir/", showWarnings = FALSE)
 png(paste0(c("plots.dir/", "MA.png"), collapse="_"))

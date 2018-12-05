@@ -1,0 +1,97 @@
+---
+title: "Differential expression"
+output: html_document
+---
+
+```{r, include=FALSE}
+library(org.Hs.eg.db)
+library(DESeq2)
+library(pheatmap)
+library(tidyverse)
+library(DT)
+library(limma)
+library(yaml)
+library("ggplot2")
+library("ggrepel") 
+dds <- readRDS("../DEresults.dir/dds.rds")
+meta_data <- read.csv("../design.tsv", sep="\t")
+source("functions.R")
+config <- read_yaml("../pipeline.yml")
+```
+
+
+The following describes the analysis of the data using DEseq2. I have seperated the analysis into the four different contrasts and have plotted summary statistics and MA plots for each.  
+
+
+## Summary of the data 
+
+```{r}
+dds$group <- relevel(dds$group, ref=config$deseq2$control)
+res <- results(dds)
+summary(res, alpha=config$deseq2$fdr)
+```
+
+
+## MA plots 
+
+In DESeq2, the function plotMA shows the log2 fold changes attributable to a given variable over the mean of normalized counts for all the samples in the DESeqDataSet. Points will be colored red if the adjusted p value is less than 0.01. Points which fall out of the window are plotted as open triangles pointing either up or down.
+
+```{r}
+DESeq2::plotMA(res)
+```
+
+# Volcano plot
+
+```{r}
+
+res_df <- as.data.frame(res)
+
+res_df <- res_df %>% 
+    dplyr::select(log2FoldChange, baseMean, padj) %>% 
+    rownames_to_column("GENE") %>% 
+  na.omit()
+  
+
+mutateddf <- mutate(res_df, sig=ifelse(res_df$padj<0.01, "padj<0.01", "Not Sig")) #Will have different colors depending on significance
+input <- mutateddf %>% 
+  arrange(mutateddf$padj)
+
+symbol_data <- head(input, 10)
+
+#convert the rownames to a column
+volc = ggplot(input, aes(log2FoldChange, -log10(padj))) + #volcanoplot with log2Foldchange versus pvalue
+    geom_point(aes(col=sig)) + #add points colored by significance
+geom_point(data=symbol_data, aes(log2FoldChange, -log10(padj)), colour="red") +
+      ggtitle("MUG KDOBA67") #e.g. 'Volcanoplot DESeq2'
+
+scale_colour_Publication <- function(...){
+  library(scales)
+  discrete_scale("colour","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+  
+}
+volc+geom_text_repel(data=symbol_data, aes(label=`GENE`)) + scale_colour_Publication() + theme_bw()#adding text for the genes
+
+```
+
+
+## Results table
+
+The folowing results tables show the significant genes. Filtering has been performed with a log2 fold change +/- 2.
+
+```{r , message=FALSE, echo=FALSE}
+dir.create("results", showWarnings = FALSE)
+rownames(res_df) <- NULL
+res_df <- res_df %>% 
+  column_to_rownames("GENE")
+dt <- filter_genes(as.data.frame(res_df), name="output")
+
+datatable(dt$sig)
+```
+
+# Download data
+
+### Full results
+<a href="results/output_res.csv" download="results/output_res.csv"><button class="btn"><i class="fa fa-download"></i> Download</button></a>
+
+### Significant results
+<a href="results/output_sig.csv" download="results/output_sig.csv"><button class="btn"><i class="fa fa-download"></i> Download</button></a>
