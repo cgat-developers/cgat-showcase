@@ -267,7 +267,7 @@ def runKallisto(infiles, outfile):
                    -o %(outfile)s
                    %(fastqfile)s
                    &> %(outfile)s/kallisto.log
-                   > %(outfile)s/kallisto.sdtout''' % locals()
+                   > %(outfile)s/kallisto.sdtout'''
 
     job_threads = 1
     P.run(statement)
@@ -291,7 +291,7 @@ def run_deseq2(infiles, outfile):
         statement = '''Rscript %(R_ROOT)s/DESeq2_lrt.R
                        --design=design.tsv
                        --contrast=%(deseq2_contrast)s
-                       --refgroup=%(deseq2_refgroup)s
+                       --refgroup=%(deseq2_control)s
                        --fdr=%(deseq2_fdr)s'''
 
     elif PARAMS['deseq2_detest'] == "wald":
@@ -299,7 +299,7 @@ def run_deseq2(infiles, outfile):
         statement = '''Rscript  %(R_ROOT)s/DESeq2_wald.R
                        --design=design.tsv
                        --contrast=%(deseq2_contrast)s
-                       --refgroup=%(deseq2_refgroup)s
+                       --refgroup=%(deseq2_control)s
                        --fdr=%(deseq2_fdr)s'''
 
     P.run(statement)

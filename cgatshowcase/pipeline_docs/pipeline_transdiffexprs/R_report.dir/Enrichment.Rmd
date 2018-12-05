@@ -3,13 +3,11 @@ title: "Enrichment"
 output: html_document
 ---
 
-```{r, include=FALSE}
+```{r, warning=FALSE, message=FALSE}
 library(clusterProfiler)
 library(DT)
 ```
 
-
-# Enrichment
 
 ## GO analysis total
 

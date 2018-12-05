@@ -20,6 +20,8 @@ requirements:
   host:
     - pip
     - python
+    - multiqc
+    - bx-python
     - cgatcore
     - cgat-scripts
     - quicksect
@@ -31,13 +33,19 @@ requirements:
     - bioconductor-tximport=1.8.0
     - bioconductor-clusterprofiler
     - bioconductor-org.hs.eg.db
+    - bioconductor-limma
     - r-optparse
     - r-ggplot2
     - r-dt
     - python-drmaa
-    - rstudio
+    - r-rmarkdown
+    - r-pheatmap
+    - r-tidyverse
+    - r-limma
   run:
     - python
+    - multiqc
+    - bx-python
     - cgatcore
     - cgat-scripts
     - quicksect
@@ -49,11 +57,15 @@ requirements:
     - bioconductor-tximport=1.8.0
     - bioconductor-clusterprofiler
     - bioconductor-org.hs.eg.db
+    - bioconductor-limma
     - r-optparse
     - r-ggplot2
     - r-dt
     - python-drmaa
-    - rstudio
+    - r-rmarkdown
+    - r-pheatmap
+    - r-tidyverse
+    - r-limma
 test:
   imports:
     - cgatshowcase
