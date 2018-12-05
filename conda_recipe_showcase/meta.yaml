@@ -30,6 +30,7 @@ requirements:
     - bioconductor-rhdf5=2.24.0
     - bioconductor-tximport=1.8.0
     - bioconductor-clusterprofiler
+    - bioconductor-org.hs.eg.db
     - r-optparse
     - r-ggplot2
     - r-dt
@@ -47,6 +48,7 @@ requirements:
     - bioconductor-rhdf5=2.24.0
     - bioconductor-tximport=1.8.0
     - bioconductor-clusterprofiler
+    - bioconductor-org.hs.eg.db
     - r-optparse
     - r-ggplot2
     - r-dt

@@ -61,8 +61,10 @@ barplot(ego, drop=TRUE)
 dotplot(ego)
 ```
 
-# Enrichment map plot
+# cnetplot plot
+
+In order to consider the potentially biological complexities in which a gene may belong to multiple annotation categories and provide information of numeric changes if available.
 
 ```{r}
-emapplot(ego, showCategory = 30)
+cnetplot(ego,  showCategory = 5,categorySize = "pvalue")
 ```

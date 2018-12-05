@@ -322,6 +322,7 @@ def run_multiqc_report():
     P.run(statement)
 
 
+@follows(mkdir("R_report.dir"))
 @follows(run_deseq2)
 def run_rmarkdown_report():
     '''This will generate a rmarkdown report '''
@@ -329,9 +330,9 @@ def run_rmarkdown_report():
     report_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                'pipeline_docs',
                                                'pipeline_transdiffexprs',
-                                               'R_report'))
+                                               'R_report.dir'))
 
-    statement = '''cp %(report_path)s/* R_report.dir ; cd R_report.dir ; R -e "rmarkdown::render_site()"'''
+    statement = '''cp %(report_path)s/* R_report.dir ; cd R_report.dir ; R -e "rmarkdown::render_site(encoding = 'UTF-8')"'''
     P.run(statement)
 
 ###################################################

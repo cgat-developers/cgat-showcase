@@ -79,6 +79,7 @@ volc+geom_text_repel(data=symbol_data, aes(label=`GENE`)) + scale_colour_Publica
 The folowing results tables show the significant genes. Filtering has been performed with a log2 fold change +/- 2.
 
 ```{r , message=FALSE, echo=FALSE}
+dir.create("results", showWarnings = FALSE)
 rownames(res_df) <- NULL
 res_df <- res_df %>% 
   column_to_rownames("GENE")
