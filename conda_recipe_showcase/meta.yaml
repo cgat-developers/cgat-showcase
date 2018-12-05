@@ -1,0 +1,69 @@
+{% set name = "cgatshowcase" %}
+{% set version = "0.1.2" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 6dc03c1447e3fecfd93fbb5f8c1ce7eb153a2995e4090a1229dc265510fbee22
+
+build:
+  skip: True # [not py3k]
+  number: 1
+  script: python setup.py install --single-version-externally-managed --record=record.txt
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+  host:
+    - pip
+    - python
+    - cgatcore
+    - cgat-scripts
+    - quicksect
+    - r-base=3.4.1
+    - bioconductor-biomart=2.36.1
+    - bioconductor-deseq2=1.18.1
+    - bioconductor-genomeinfodb=1.14.0
+    - bioconductor-rhdf5=2.24.0
+    - bioconductor-tximport=1.8.0
+    - bioconductor-clusterprofiler
+    - r-optparse
+    - r-ggplot2
+    - r-dt
+    - python-drmaa
+    - rstudio
+  run:
+    - python
+    - cgatcore
+    - cgat-scripts
+    - quicksect
+    - r-base=3.4.1
+    - bioconductor-biomart=2.36.1
+    - bioconductor-deseq2=1.18.1
+    - bioconductor-genomeinfodb=1.14.0
+    - bioconductor-rhdf5=2.24.0
+    - bioconductor-tximport=1.8.0
+    - bioconductor-clusterprofiler
+    - r-optparse
+    - r-ggplot2
+    - r-dt
+    - python-drmaa
+    - rstudio
+test:
+  imports:
+    - cgatshowcase
+  commands:
+    - cgatshowcase --help >& /dev/null
+
+about:
+  home: https://github.com/cgat-developers/cgat-showcase
+  license: MIT
+  license_family: MIT
+  summary: The Computational Genomics Analysis Toolkit example pipeline/workflow
+
+extra:
+  recipe-maintainers:
+    - 12068583
