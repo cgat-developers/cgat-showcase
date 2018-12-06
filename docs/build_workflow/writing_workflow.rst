@@ -160,14 +160,40 @@ The configuration file then needs to be written so that the yml parser can pick 
 
 The kmer will then have the value of 31 and can be passed into then pipeline. This is accessed within the pipeline as PARAMS['kallisto_kmer'] and will have the value 31.
 
-6. generating a report
+6. Generating a report
 ----------------------
 
-In order to present our results in a visually appealing manner, we use multiQC resports to display generic sequencing metrics and rmarkdown (or ipython if you prefer) for generating
+In order to present our results in a visually appealing manner, we use multiQC reports to display generic sequencing metrics and `rmarkdown <https://rmarkdown.rstudio.com/>`_ (or ipython if you prefer) for generating
 bespoke reports.
 
 In order to write a report you will need to generate an rmarkdown document folder as follows::
 
    mkdir cgat-showcase/cgatshowcase/pipeline_docs/pipeline_transdiffexprs/R_report
 
+Rmarkdown reports are best constructed using rstudio as they can be written dynamically, then best tested within the build functionality within rstudio.
+
+In order to build a Rmarkdown website we usually follow the Rmarkdown `tutorial <https://rmarkdown.rstudio.com/lesson-1.html>`_  
+
+The basic requirements for building a website are::
+
+   index.Rmd
+   _site.yml
+   R_report.Rproj
+
+Once the report has been developed in rstudio and tested then the pipeline requires a function to copy and then render the report::
+
+    @follows(mkdir("R_report.dir"))
+    @follows(run_deseq2)
+    def run_rmarkdown_report():
+	'''This will generate a rmarkdown report '''
+
+	report_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
+						   'pipeline_docs',
+						   'pipeline_transdiffexprs',
+						   'R_report.dir'))
+
+	statement = '''cp %(report_path)s/* R_report.dir ; cd R_report.dir ; R -e "rmarkdown::render_site(encoding = 'UTF-8')"'''
+	P.run(statement)
+
+This function copies the R_report.dir from the main repository and then calles rmarkdown to render the website according to the _site.yml configuration file. 
 

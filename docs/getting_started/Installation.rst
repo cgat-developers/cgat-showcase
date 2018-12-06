@@ -22,7 +22,17 @@ Once you have conda installed then to install cgat-showcase please do the follow
    conda install -c cgat cgatshowcase
 
 This should install all of the dependancies and you should be read to proceded to the Writing workflows and Tutorial section.
+However, conda is currently having issues with speed of installation. This is related to the solver and is something that is known and the conda developers are workin on new fixes for this.
+Please see `conda issue <https://github.com/conda/conda/issues/7239>`_ for more information.
 
+Pip installation
+----------------
+
+Alternatively, cgatshowcase can also be installed using pypi::
+
+   pip install cgatshowcase
+
+However, the dependancies will have to be installed seperately.
 
 Manual installation
 -------------------
