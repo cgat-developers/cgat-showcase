@@ -18,7 +18,7 @@ Tutorial
 The first step in any pipeline is to think about the problem that you are trying solve. 
 For example: 
 
-**The probelm:** I need to perform differential expression analysis quickly and consistently across all my samples. I also need the solution to scale and be ran on my mac or districuted across a cluster.
+**The problem:** I need to perform differential expression analysis quickly and consistently across all my samples. I also need the solution to scale and be ran on my mac or districuted across a cluster.
 **The solution:** Build a cgat-core workflow that wraps pseduocounting tools (kallisto) and differential expression analysis tools (deseq2). 
 
 Then the next step is to think about the steps needed to reach the solution.
