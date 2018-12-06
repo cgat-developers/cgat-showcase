@@ -252,15 +252,12 @@ def runKallisto(infiles, outfile):
     	bn = P.snip(fastqfile, ".fastq.1.gz")
     	infile1 = "%s.fastq.1.gz" % bn
     	infile2 = "%s.fastq.2.gz" % bn
-    	if not os.path.exists(infile2):
-    		raise ValueError(
-    			"can not find paired ended file "
-    			"'%s' for '%s'" % (infile2, infile))
+    	
     	fastqfile = infile1 + " " + infile2
+    E.warn(outfile)
+    outfile = outfile.replace("/abundance.h5","")
 
-    outfile = outfile.replace("abundance.h5","")
-
-    statement = '''kallisto quant
+    statement = '''mkdir %(outfile)s && kallisto quant
                    -i %(index)s
                    -t %(kallisto_threads)s
                    %(kallisto_options)s
@@ -269,7 +266,6 @@ def runKallisto(infiles, outfile):
                    &> %(outfile)s/kallisto.log
                    > %(outfile)s/kallisto.sdtout'''
 
-    job_threads = 1
     P.run(statement)
 
 
