@@ -1,5 +1,5 @@
 {% set name = "cgatshowcase" %}
-{% set version = "0.1.2" %}
+{% set version = "0.1.5" %}
 
 package:
   name: "{{ name|lower }}"
@@ -7,12 +7,11 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  sha256: 6dc03c1447e3fecfd93fbb5f8c1ce7eb153a2995e4090a1229dc265510fbee22
+  sha256: 4e24ba2bfb57af4c2b1494cd9826701a67a9400518ef546783d0d89d34dd9124
 
 build:
   skip: True # [not py3k]
-  number: 2
-  script: $PYTHON setup.py install --single-version-externally-managed --record=record.txt
+  number: 1
 
 requirements:
   build:
@@ -20,33 +19,18 @@ requirements:
   host:
     - pip
     - python
-    - multiqc
+    - setuptools
     - bx-python
-    - cgatcore
     - cgat-scripts
     - quicksect
     - r-base=3.4.1
-    - bioconductor-biomart=2.36.1
-    - bioconductor-deseq2=1.18.1
-    - bioconductor-genomeinfodb=1.14.0
-    - bioconductor-rhdf5=2.24.0
-    - bioconductor-tximport=1.8.0
-    - bioconductor-clusterprofiler
-    - bioconductor-org.hs.eg.db
-    - bioconductor-limma
-    - r-optparse
-    - r-ggplot2
-    - r-dt
-    - python-drmaa
-    - r-rmarkdown
-    - r-pheatmap
-    - r-tidyverse
-    - r-limma
+
   run:
     - python
     - multiqc
     - bx-python
     - cgatcore
+    - kallisto
     - cgat-scripts
     - quicksect
     - r-base=3.4.1
@@ -58,6 +42,7 @@ requirements:
     - bioconductor-clusterprofiler
     - bioconductor-org.hs.eg.db
     - bioconductor-limma
+    - bioconductor-xvector
     - r-optparse
     - r-ggplot2
     - r-dt
@@ -65,7 +50,6 @@ requirements:
     - r-rmarkdown
     - r-pheatmap
     - r-tidyverse
-    - r-limma
 test:
   imports:
     - cgatshowcase

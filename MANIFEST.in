@@ -1,2 +1,9 @@
+include MANIFEST.in
+include INSTALL
+include README.rst
+include KNOWN_BUGS
+
 include cgatshowcase/R/*.R
+include cgatshowcase/pipeline_docs/pipeline_transdiffexprs/R_report.dir/*
+include cgatshowcase/pipeline_transdiffexprs/*
 exclude *~
