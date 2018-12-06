@@ -82,7 +82,7 @@ setup(
     url="https://github.com/cgat-developers/cgat-showcase",
     # package contents
     packages=find_packages(),
-    package_data={'cgatshowcase':['cgatshowcase/R/*.R']},
+    package_data={'cgatshowcase':['cgatshowcase/R/*.R', 'cgatshowcase/pipeline_docs/pipeline_transdiffexprs/R_report.dir/*', '/cgatshowcase/pipeline_transdiffexprs/*']},
     package_dir=cgat_package_dirs,
     include_package_data=True,
     entry_points={
