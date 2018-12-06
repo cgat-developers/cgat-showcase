@@ -252,9 +252,11 @@ def runKallisto(infiles, outfile):
     	bn = P.snip(fastqfile, ".fastq.1.gz")
     	infile1 = "%s.fastq.1.gz" % bn
     	infile2 = "%s.fastq.2.gz" % bn
-    	
+    	if os.path.exists(infile2):
+            raise ValueError("cant find paired end file "
+                             "'%s' for '%s'" % (infile, infile2))
     	fastqfile = infile1 + " " + infile2
-    E.warn(outfile)
+
     outfile = outfile.replace("/abundance.h5","")
 
     statement = '''mkdir %(outfile)s && kallisto quant
