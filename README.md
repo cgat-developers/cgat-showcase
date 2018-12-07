@@ -3,7 +3,7 @@
 cgat-showcase is a repository containing an example pipeline constructed to demonstrate how our [cgat-core](https://github.com/cgat-developers/cgat-core) workflow management system can be used to create common workflows required in bioinformatics analysis.
 
 Within this repository the example [pipeline](https://github.com/cgat-developers/cgat-showcase/blob/master/cgatshowcase/pipeline_transdiffexprs.py) performs pseudoalignment of fastq files
-with kallisto and differential expression using deseq2. It can be run locally on your own machine or distributed across a cluster depending on your requirements.
+with [kallisto](https://pachterlab.github.io/kallisto/about.html) and differential expression using [DESeq2](https://www.bioconductor.org/packages/release/bioc/html/DESeq2.html). It can be run locally on your own machine or distributed across a cluster depending on your requirements.
 
 Documentation on how to run this pipeline can be found [here](https://cgat-showcase.readthedocs.io/en/latest/) and documentation on how
 to build your own custom workflow from scratch can be found [here](https://cgat-core.readthedocs.io/en/latest/defining_workflow/Tutorial.html).
