@@ -16,21 +16,20 @@ CGAT-showcase documentation!
     :target: https://twitter.com/cgat_oxford?lang=en
     :alt: Twitter URL
 
-CGAT-showcase contains a showcase example of how to build workflows suing our cgatcore  workflow management system. 
-cgatcore allows you to quickly build both simple and complex reproducible pipelines completely within python. 
+**cgat-showcase** contains a basic RNA-seq differential expression pipeline to illustrate how to build workflows using the **cgat-core**  workflow management system. 
+cgatcore allows you to quickly build both simple and complex pipelines for reproducible data analysis within a python script. 
 
-CGAT-core is  a set of libraries and helper functions used to enable researchers
-to design and build computational workflows for the analysis of large-scale data-analysis. Access to code is
+**cgat-core** is  a set of libraries and helper functions that enable researchers
+to quickly design and build computational workflows for the analysis of large-scale data-analysis. Access to code is
 through `github <https://github.com/cgat-developers/cgat-showcase>`_ and documentation can be accessed `here <https://cgat-core.readthedocs.io/en/latest/>`_.
 
-Used in combination with `CGAT-apps <https://github.com/cgat-developers/cgat-apps>`_, we have deomonstrated the functionality of our
+Used in combination with `cgat-apps <https://github.com/cgat-developers/cgat-apps>`_, we have deomonstrated the functionality of our
 flexible implementation using a set of well documented, easy to install and easy to use workflows, which can be found in our `cgat-flow <https://github.com/cgat-developers/cgat-flow>`_ repository.
 
 However, in this repository we have developed a toy example showing the functionality of our code. For further information on the advanced functionality of our
 code please refer to the `cgat-flow docuemntation <https://www.cgat.org/downloads/public/cgatpipelines/documentation/>`_. 
 
-CGAT-core is open-sourced, powerful and user-friendly, and has been continually developed
-as a Next Generation Sequencing (NGS) workflow management system over the past 10 years.
+cgat-core is a user-friendly and powerful open-source workflow management system and has been continually developed and used for implemention Next Generation Sequencing (NGS) pipelines for over 10 years.
 
 
 .. _manual-quick_example:
