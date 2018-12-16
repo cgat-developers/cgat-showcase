@@ -115,6 +115,7 @@ import cgat.GTF as GTF
 import cgatcore.iotools as iotools
 import cgatcore.experiment as E
 from cgatcore import pipeline as P
+import ModuleTransdiffexprs
 
 # load options from the config file
 P.get_parameters(
@@ -248,14 +249,7 @@ def runKallisto(infiles, outfile):
     index = infiles[1]
 
     # check for paired end files and overwrite fastqfile if True
-    if fastqfile.endswith(".fastq.1.gz"):
-    	bn = P.snip(fastqfile, ".fastq.1.gz")
-    	infile1 = "%s.fastq.1.gz" % bn
-    	infile2 = "%s.fastq.2.gz" % bn
-    	if os.path.exists(infile2):
-            raise ValueError("cant find paired end file "
-                             "'%s' for '%s'" % (infile, infile2))
-    	fastqfile = infile1 + " " + infile2
+    fastqfile = ModuleTransdiffexprs.check_paired_end(fastqfile)
 
     outfile = outfile.replace("/abundance.h5","")
 
