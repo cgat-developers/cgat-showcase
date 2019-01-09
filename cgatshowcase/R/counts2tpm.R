@@ -1,5 +1,3 @@
-setwd(".")
-
 library(optparse)
 library(rtracklayer)
 library(GenomicRanges)

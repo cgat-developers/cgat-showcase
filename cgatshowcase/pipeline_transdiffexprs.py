@@ -243,7 +243,7 @@ def runKallisto(infiles, outfile):
 
 @mkdir("DEresults.dir")
 @merge(runKallisto,
-       ["DEresults.dir/counts.csv","DEresults.dir/length.csv"])
+       "DEresults.dir/counts.csv")
 def run_deseq2(infiles, outfiles):
     ''' run DESeq2 to identify differentially expression'''
 
@@ -281,9 +281,10 @@ def run_deseq2(infiles, outfiles):
 
 # active_if decorators control the flow of a pipeline
 @active_if(PARAMS["tpm_run"] == 1)
-@merge(run_deseq2,
-         "DEresults.dir/tpm.tsv")
-def counts2tpm(infiles, outfile):
+@transform(run_deseq2,
+           suffix(".csv"),
+           ".tsv")
+def counts2tpm(infile, outfile):
     '''Converts counts to tpm values using a gist ada-pted from slowkow:
        https://gist.github.com/slowkow/c6ab0348747f86e2748b
 
@@ -296,16 +297,14 @@ def counts2tpm(infiles, outfile):
 
     R_ROOT = os.path.join(os.path.dirname(__file__), "R")
 
-    counts, length = infiles
-
     # on our cluster there is latency before the deseq2 counts are saved
     # therefore I have added a sleep to make sure output from previous task
     # has closed the connection fully.
-    statement = '''sleep 30 && Rscript counts2tpm.R
-                           --counts=%(counts)s
+    statement = '''sleep 30 && %(R_ROOT)s/Rscript counts2tpm.R
+                           --counts=%(infile)s
                            --genome=%(tpm_genome_version)s
                            --meanfraglength=%(tpm_frag_length)s
-                           --effectivelength=%(length)s'''
+                           --effectivelength=DEresults.dir/length.csv &> test.txt'''
 
     P.run(statement)
 
