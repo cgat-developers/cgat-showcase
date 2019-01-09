@@ -250,7 +250,6 @@ def run_deseq2(infiles, outfiles):
     # this may be a bug, but when you supply a list of output files
     # using @merge you need to unpack them before running P.run(). I will
     # look into this AC
-    outfile, _  = outfiles
 
     R_ROOT = os.path.join(os.path.dirname(__file__), "R")
 
