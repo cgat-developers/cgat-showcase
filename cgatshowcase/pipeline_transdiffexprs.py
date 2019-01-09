@@ -303,7 +303,7 @@ def counts2tpm(infile, outfile):
                            --counts=%(infile)s
                            --genome=%(tpm_genome_version)s
                            --meanfraglength=%(tpm_frag_length)s
-                           --effectivelength=DEresults.dir/length.csv &> test.txt'''
+                           --effectivelength=DEresults.dir/length.csv'''
 
     P.run(statement)
 
