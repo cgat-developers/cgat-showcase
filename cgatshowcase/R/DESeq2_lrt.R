@@ -14,7 +14,9 @@ option_list <- list(
 					make_option(c("--refgroup"), default="must_specify",
 					help="must specify a reference group to compare against in the pipeline.yml file"),
 					make_option(c("--fdr"), default=0.05,
-					help="set an optional fdr, will default to 0.05"))
+					help="set an optional fdr, will default to 0.05"),
+					make_option(c("--biomart"), default="must_specify",
+					help="must specify a biomart reference dataset"))
 
 opt <- parse_args(OptionParser(option_list=option_list))
 
@@ -31,8 +33,7 @@ files <- file.path(dir, sample_track, "abundance.tsv")
 
 
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
-                         #dataset = "hsapiens_gene_ensembl",
-                         dataset = "hsapiens_gene_ensembl",
+                         dataset = opt$biomart,
                          host="www.ensembl.org")
 
 t2g <- biomaRt::getBM(

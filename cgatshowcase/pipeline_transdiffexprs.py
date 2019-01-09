@@ -153,9 +153,8 @@ def buildReferenceTranscriptome(infile, outfile):
 
     statement = '''
     zcat < %(infile)s |
-    awk '$3=="exon"'|
     cgat gff2fasta
-    --is-gtf --genome-file=%(genome_file)s --fold-at=60 -v 0
+    --feature=exon --is-gtf --genome-file=%(genome_file)s --fold-at=60 -v 0
     --log=%(outfile)s.log > %(outfile)s;
     samtools faidx %(outfile)s
     '''
@@ -195,16 +194,9 @@ def buildKallistoIndex(infile, outfile):
 #################################################
 
 
-SEQUENCESUFFIXES = ("*.fastq.1.gz",
-                    "*.fastq.gz")
-SEQUENCEFILES = tuple([suffix_name for suffix_name in SEQUENCESUFFIXES])
-
-SEQUENCEFILES_REGEX = regex(
-        "(\S+).(fastq.1.gz|fastq.gz)")
-
-
-@transform(SEQUENCEFILES,
-           SEQUENCEFILES_REGEX,
+@transform(tuple([suffix_name for suffix_name in ("*.fastq.1.gz",
+                                                  "*.fastq.gz")]),
+           regex("(\S+).(fastq.1.gz|fastq.gz)"),
            add_inputs(buildKallistoIndex),
            r"kallisto.dir/\1/abundance.h5")
 def runKallisto(infiles, outfile):
@@ -213,36 +205,7 @@ def runKallisto(infiles, outfile):
     file and an indexed transcriptome using Kallisto.
     Runs the kallisto "quant" function across transcripts with the specified
     options.  Read counts across genes are counted as the total in all
-    transcripts of that gene (based on the getTranscript2GeneMap table)
-    Parameters
-    ----------
-    infiles: list
-        list with three components
-        0 - list of strings - paths to fastq files to merge then quantify
-        across using Kallisto
-        1 - string - path to Kallisto index file
-        2 - string - path totable mapping transcripts to genes
-    kallisto_threads: int
-       :term: `PARAMS` the number of threads for Kallisto
-    kallisto_memory: str
-       :term: `PARAMS` the job memory for Kallisto
-    kallisto_options: str
-       :term: `PARAMS` string to append to the Kallisto quant command to
-       provide specific
-       options, see https://pachterlab.github.io/kallisto/manual
-    kallisto_bootstrap: int
-       :term: `PARAMS` number of bootstrap samples to run.
-       Note, you need to bootstrap for differential expression with sleuth
-       if there are no technical replicates. If you only need point estimates,
-       set to 1.  Note that bootstrap must be set to at least 1
-    kallisto_fragment_length: int
-       :term: `PARAMS` Fragment length for Kallisto, required for single end
-       reads only
-    kallisto_fragment_sd: int
-       :term: `PARAMS` Fragment length standard deviation for Kallisto,
-       required for single end reads only.
-    outfiles: list
-       paths to output files for transcripts and genes
+    transcripts of that gene.
     '''
 
     fastqfile = infiles[0]
@@ -284,7 +247,8 @@ def run_deseq2(infiles, outfile):
                        --design=design.tsv
                        --contrast=%(deseq2_contrast)s
                        --refgroup=%(deseq2_control)s
-                       --fdr=%(deseq2_fdr)s'''
+                       --fdr=%(deseq2_fdr)s
+                       --biomart=%(deseq2_biomart)s'''
 
     elif PARAMS['deseq2_detest'] == "wald":
         
@@ -292,7 +256,8 @@ def run_deseq2(infiles, outfile):
                        --design=design.tsv
                        --contrast=%(deseq2_contrast)s
                        --refgroup=%(deseq2_control)s
-                       --fdr=%(deseq2_fdr)s'''
+                       --fdr=%(deseq2_fdr)s
+                       --biomart=%(deseq2_biomart)s'''
 
     P.run(statement)
 
