@@ -111,7 +111,6 @@ from ruffus.combinatorics import *
 import sys
 import os
 import pandas as pd
-import cgat.GTF as GTF
 import cgatcore.iotools as iotools
 import cgatcore.experiment as E
 from cgatcore import pipeline as P
