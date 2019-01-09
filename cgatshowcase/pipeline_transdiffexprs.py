@@ -300,7 +300,7 @@ def counts2tpm(infile, outfile):
     # on our cluster there is latency before the deseq2 counts are saved
     # therefore I have added a sleep to make sure output from previous task
     # has closed the connection fully.
-    statement = '''sleep 30 && %(R_ROOT)s/Rscript counts2tpm.R
+    statement = '''sleep 30 && Rscript %(R_ROOT)s/counts2tpm.R
                            --counts=%(infile)s
                            --genome=%(tpm_genome_version)s
                            --meanfraglength=%(tpm_frag_length)s
