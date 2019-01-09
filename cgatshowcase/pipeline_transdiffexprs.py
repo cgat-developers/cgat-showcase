@@ -235,9 +235,14 @@ def runKallisto(infiles, outfile):
 
 @mkdir("DEresults.dir")
 @merge(runKallisto,
-       "DEresults.dir/counts.csv")
-def run_deseq2(infiles, outfile):
+       ["DEresults.dir/counts.csv","DEresults.dir/length.csv"])
+def run_deseq2(infiles, outfiles):
     ''' run DESeq2 to identify differentially expression'''
+
+    # this may be a bug, but when you supply a list of output files
+    # using @merge you need to unpack them before running P.run(). I will
+    # look into this AC
+    outfile, _  = outfiles
 
     R_ROOT = os.path.join(os.path.dirname(__file__), "R")
 
@@ -258,6 +263,34 @@ def run_deseq2(infiles, outfile):
                        --refgroup=%(deseq2_control)s
                        --fdr=%(deseq2_fdr)s
                        --biomart=%(deseq2_biomart)s'''
+
+    P.run(statement)
+
+
+###################################################
+# Convert counts to tpm values
+###################################################
+
+# active_if decorators control the flow of a pipeline
+@active_if(PARAMS["tpm_run"] == 1)
+@merge(run_deseq2,
+         "DEresults.dir/tpm.csv")
+def counts2tpm(infiles, outfile):
+    '''Converts counts to tpm values using a gist ada-pted from slowkow:
+       https://gist.github.com/slowkow/c6ab0348747f86e2748b '''
+
+    R_ROOT = os.path.join(os.path.dirname(__file__), "R")
+
+    counts, length = infiles
+
+    # on our cluster there is latency before the deseq2 counts are saved
+    # therefore I have added a sleep to make sure output from previous task
+    # has closed the connection fully.
+    statement = '''sleep 30 && Rscript counts2tpm.R
+                           --counts=%(counts)s
+                           --genome=%(tpm_genome_version)s
+                           --meanfraglength=%(tpm_frag_length)s
+                           --effectivelength=%(length)i'''
 
     P.run(statement)
 
@@ -295,7 +328,7 @@ def run_rmarkdown_report():
 ###################################################
 # target functions for code execution             #
 ###################################################
-@follows(run_multiqc_report, run_rmarkdown_report)
+@follows(run_multiqc_report, run_rmarkdown_report, counts2tpm)
 def full():
     'dummy task for full ruffus tasks'
     pass

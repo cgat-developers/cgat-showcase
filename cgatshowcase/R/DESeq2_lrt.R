@@ -57,11 +57,21 @@ res = suppressMessages(results(dds,
 				contrast=c("group",contrast_levels[2], contrast_levels[1])))
 res = as.data.frame(res)
 
-write.csv(res, file="DEresults.dir/counts.csv")
+# write the counts table to file
+colnames(txi.kallisto$counts) <- design$track 
+write.csv(txi.kallisto$counts, file="DEresults.dir/counts.csv")
 
+# write the results dataframe
+write.csv(res, file="DEresults.dir/res.csv")
+
+# write the effective length
+colnames(txi.kallisto$length) <- design$track 
+write.csv(txi.kallisto$length, "DEresults.dir/length.csv")
+
+# save the RDS for processing outside of the pipeline
 saveRDS(dds, "DEresults.dir/dds.rds")
 
-
+# Generate plotting of the Deseq2 objects
 dir.create("plots.dir/", showWarnings = FALSE)
 png(paste0(c("plots.dir/", "MA.png"), collapse="_"))
 plotMA(dds, alpha=opt$fdr)

@@ -61,7 +61,15 @@ res = suppressMessages(results(dds))
 res = as.data.frame(res)
 
 # write the counts table to file
-write.csv(res, file="DEresults.dir/counts.csv")
+colnames(txi.kallisto$counts) <- design$track 
+write.csv(txi.kallisto$counts, file="DEresults.dir/counts.csv")
+
+# write the results dataframe
+write.csv(res, file="DEresults.dir/res.csv")
+
+# write the effective length
+colnames(txi.kallisto$length) <- design$track 
+write.csv(txi.kallisto$length, "DEresults.dir/length.csv")
 
 # save the RDS for processing outside of the pipeline
 saveRDS(dds, "DEresults.dir/dds.rds")
