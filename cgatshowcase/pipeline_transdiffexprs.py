@@ -115,7 +115,7 @@ import cgat.GTF as GTF
 import cgatcore.iotools as iotools
 import cgatcore.experiment as E
 from cgatcore import pipeline as P
-import ModuleTransdiffexprs
+import cgatshowcase.ModuleTransdiffexprs
 
 # load options from the config file
 P.get_parameters(

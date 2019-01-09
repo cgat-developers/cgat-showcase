@@ -26,11 +26,11 @@ Tutorial
 **2.** Next we will generate a configuration yml file so the pipeline output can be modified::
 
    cd showcase_test_data
-   cgatshowcase transdiffexpres config
+   cgatshowcase transdiffexprs config
 
 or you can alternatively call the workflow file directly::
 
-   python /path/to/file/pipeline_transdiffexpres.py config
+   python /path/to/file/pipeline_transdiffexprs.py config
 
 This will generate a **pipeline.yml** file containing the configuration parameters than can be used to modify
 the output of the pipleine. However, for this tutorial you do not need to modify the parameters to run the 
@@ -39,7 +39,7 @@ change the output of the pipeline.
 
 **3.** Next we will run the pipleine::
 
-   cgatshowcase transdiffexpres make full -v5 --no-cluster
+   cgatshowcase transdiffexprs make full -v5 --no-cluster
 
 This ``--no-cluster`` will run the pipeline locally if you do not have access to a cluster. Alternatively if you have a
 cluster remove the ``--no-cluster`` option and the pipleine will distribute your jobs accross the cluster.
