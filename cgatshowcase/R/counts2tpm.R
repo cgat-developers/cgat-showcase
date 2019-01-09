@@ -69,4 +69,4 @@ counts$X <- NULL
 tpm <- counts_to_tpm(counts, effectivelength, rep(as.numeric(opt$meanfraglength), length(colnames(counts))))
 
 # output the tpm as a table
-write.csv(tpm, "DEresults.dir/tpm.csv")
+write.table(tpm, "DEresults.dir/tpm.tsv", sep="\t")

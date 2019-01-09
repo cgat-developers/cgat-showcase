@@ -151,6 +151,15 @@ def buildReferenceTranscriptome(infile, outfile):
     genome_file = os.path.abspath(
         os.path.join(PARAMS["genome_dir"], PARAMS["genome"] + ".fa"))
 
+    #####################################
+    # Domonstraion of logging and warning
+    #####################################
+    # infomation can be output to the standard out using E.info()
+    E.info(genome_file)
+    # warning messages can also be displayed to stdout using E.warn()
+    E.warn("This is an example of a message used to warn people")
+
+
     statement = '''
     zcat < %(infile)s |
     cgat gff2fasta
@@ -274,10 +283,17 @@ def run_deseq2(infiles, outfiles):
 # active_if decorators control the flow of a pipeline
 @active_if(PARAMS["tpm_run"] == 1)
 @merge(run_deseq2,
-         "DEresults.dir/tpm.csv")
+         "DEresults.dir/tpm.tsv")
 def counts2tpm(infiles, outfile):
     '''Converts counts to tpm values using a gist ada-pted from slowkow:
-       https://gist.github.com/slowkow/c6ab0348747f86e2748b '''
+       https://gist.github.com/slowkow/c6ab0348747f86e2748b
+
+       Parameters
+       ----------
+       infiles: output of deseq2 counts and length
+       genome: the genome name in ensembl format
+       meanfraglength: the mean fragment length - this can be estimated from bioanalyzer
+    '''
 
     R_ROOT = os.path.join(os.path.dirname(__file__), "R")
 
@@ -290,9 +306,25 @@ def counts2tpm(infiles, outfile):
                            --counts=%(counts)s
                            --genome=%(tpm_genome_version)s
                            --meanfraglength=%(tpm_frag_length)s
-                           --effectivelength=%(length)i'''
+                           --effectivelength=%(length)s'''
 
     P.run(statement)
+
+
+##################################################
+# Add output of counts to a database
+##################################################
+
+@transform(counts2tpm, suffix(".tsv"), ".load")
+def load_tpm(infile, outfile):
+    '''This function uploads a tsv seperated file to an sqlite database
+       Parameters
+       ----------
+       infile: term tsv file containing a table of tpm outputs
+       outfile: .load file
+    '''
+
+    P.load(infile,outfile)
 
 
 ###################################################
