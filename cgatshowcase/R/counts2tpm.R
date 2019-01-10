@@ -1,6 +1,4 @@
 library(optparse)
-library(rtracklayer)
-library(GenomicRanges)
 
 option_list <- list(
 					make_option(c("--counts"), default="must_specify",

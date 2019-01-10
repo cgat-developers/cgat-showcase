@@ -10,9 +10,6 @@ navbar:
   - text: Differential expression
     icon: fa-link
     href: DE.html
-  - text: Enrichment
-    icon: fa-link
-    href: Enrichment.html
 
 output:
   html_document:

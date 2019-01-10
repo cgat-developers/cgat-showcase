@@ -18,7 +18,6 @@ library(org.Hs.eg.db)
 library(DESeq2)
 library(pheatmap)
 library(dplyr)
-library(pheatmap)
 library(RColorBrewer)
 
 meta_data <- read.csv("../design.tsv", sep="\t")
