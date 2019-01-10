@@ -1,7 +1,9 @@
 project_name: showcase_test
 
+# name of the gtf file in gz format, located in the directory the pipeline will be ran.
 geneset: refcoding.gtf.gz
 
+# This is the name of the fasta genome indexed
 genome: hg19
 
 # location of indexed genome 
@@ -56,10 +58,10 @@ merge_pattern_input:
 #########################
 
 # differential expression methods to apply
-# allowable quantifiers are:
+# currently the only allowable quantifier is:
 # deseq2
-# sleuth
-de_tools: [deseq2,sleuth]
+# although this pipeline could be extended to include edgeR or sleuth.
+de_tools: [deseq2]
 
 
 ################################################################
@@ -71,17 +73,6 @@ deseq2:
     fdr: 0.05
 
     # model to pass as DESeq2 design
-    # for each design[experiment].tsv you need to define a model and
-    # contrast and refgroup
-
-    # e.g if you have two experiments (1 & 2)
-    # model1=~group
-    # contrast1=group
-    # refgroup1=Brain1
-    # model2=~group+condition
-    # contrast2=condition
-    # refgroup2=treated
-
     model: ~group
 
     # contrast to return during post-hoc pairwise tests
@@ -92,4 +83,26 @@ deseq2:
     # test for significance for deseq1 - wald or lrt
     detest: wald
 
+    # Set the correct bioMart dataset to convert ensembl
+    # transcripts to gene id's
+    # To find the available dataset for each species you have mapped against
+    # type mart=useMart(biomert="ENSEMBL_MART_ENSEMBL", host="www.ensembl.org") then
+    # listDatasets(mart) and choose the correct one for your species. e.g. mmusculus_gene_ensembl for mouse. 
+    biomart: hsapiens_gene_ensembl
 
+##################################################################
+# Convert counts to tpm values
+###################################################################
+
+tpm:
+    # This calculation can be turned on or off. set to 1 to run or 0 to turn off.
+    run: 1
+
+    # The tpm conversion required you to specify the genome version used according to
+    # GRC ensembl format. e.g. for example if mm10 then specify GRCm38
+    genome_version: GRCh37.75
+
+    # tpm calulation requires a mean fragment length for your sample libraries
+    # this can be calculated experimentally by looking at the bioanalyzer trace or calulated bioinformatically
+    # using picard tools
+    frag_length: 200 
