@@ -43,16 +43,6 @@ kallisto:
     # job memory for Kallisto
     memory: 6G
 
-
-################
-# Merging files
-################
-
-merge_pattern_output:
-
-merge_pattern_input: 
-
-
 #########################
 # Differential expression
 #########################
