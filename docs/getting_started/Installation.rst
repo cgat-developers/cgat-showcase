@@ -21,9 +21,29 @@ Once you have conda installed then to install cgat-showcase please do the follow
 
    conda install -c cgat cgatshowcase
 
-This should install all of the dependancies and you should be read to proceded to the Writing workflows and Tutorial section.
+This should install all of the dependancies and you should be ready to proceded to the Writing workflows and Tutorial section.
 However, conda is currently having issues with speed of installation. This is related to the solver and is something that is known and the conda developers are workin on new fixes for this.
 Please see `conda issue <https://github.com/conda/conda/issues/7239>`_ for more information.
+
+If you find that the package installation just sits at `Solving environent`, just be patient this will take a while but will install. Alternmatively install using the anaconda cloud environment ppackage, using the instructions below.
+
+Installtion using conda environment
+----------------------------------
+
+The package distribution is quite large at the moment and as a consequence of problems with the conda solver it takes quite a long time to install the conda package.
+
+As a temporary work around we have included the conda environemnt used to run the cgatshowcase on the anaconda cloud. Please follow the instructions below#::
+
+    conda env create cgat/cgatshowcase-env
+
+You will then need to clone the cgatshowcase resository and run setup as follows::
+
+    conda activate cgatshowcase-env
+    git clone https://github.com/cgat-developers/cgat-showcase.git
+    cd cgat-showcase
+    python setup.py develop
+    cgatshowcase --help
+
 
 Pip installation
 ----------------
@@ -39,8 +59,8 @@ Manual installation
 
 To obtain the latest code, check it out from the public git repository and activate it::
 
-   git clone https://github.com/cgat-developers/cgat-core.git
-   cd cgat-core
+   git clone https://github.com/cgat-developers/cgat-showcase.git
+   cd cgat-showcase
    python setup.py develop
 
 Once checked-out, you can get the latest changes via pulling::
