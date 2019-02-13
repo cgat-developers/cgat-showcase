@@ -48,16 +48,11 @@ cluster remove the ``--no-cluster`` option and the pipleine will distribute your
 
    There are many commandline options available to run the pipeline. To see available options please run :code:`cgatshowcase --help`.
 
-**4.** Generate a report
+**4.** Report viewing
 
-The final step is to generate a report to display the output of the pipeline. We have a preference for using MultiQC
-for generate bioinformatics tools (such as mappers and pseudoaligners) and Rmarkdown for generating custom reports.
-In order to generate these run the command::
+The final step is to evaluate the ouput of the pipeline by viewing the reports generated as part of running the full task.  We have a preference for using MultiQC for general bioinformatics tools (such as mappers and pseudoaligners) and Rmarkdown for generating custom reports.
 
-    cgatshowcase transdiffexprs make build_report -v 5 --no-cluster
-
-This will generate a MultiQC report in the folder `MultiQC_report.dir/` and an Rmarkdown report in `R_report.dir/`. 
-
+The pipeline generates both a MultiQC report in the folder `MultiQC_report.dir/` and an Rmarkdown report in `R_report.dir/`. 
 
 
 This completes the tutorial for running the transdiffexprs pipeline for cgat-showcase, hope you find it as useful as

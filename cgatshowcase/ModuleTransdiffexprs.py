@@ -12,6 +12,7 @@ Code
 
 '''
 from cgatcore import pipeline as P
+import os
 
 def check_paired_end(fastqfile):
     "checks if data is paired end or single end"
@@ -19,7 +20,7 @@ def check_paired_end(fastqfile):
         bn = P.snip(fastqfile, ".fastq.1.gz")
         infile1 = "%s.fastq.1.gz" % bn
         infile2 = "%s.fastq.2.gz" % bn
-        if os.path.exists(infile2):
+        if not os.path.exists(infile2):
             raise ValueError("cant find paired end file "
                              "'%s' for '%s'" % (infile, infile2))
         fastqfile = infile1 + " " + infile2
