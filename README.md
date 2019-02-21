@@ -1,4 +1,6 @@
-![cgat-showcase](https://github.com/cgat-developers/cgat-showcase/docs/img/CGAT_showcase.tif)
+.. image:: https://github.com/cgat-developers/cgat-showcase/docs/img/CGAT_showcase.tif
+   :alt: Conda Logo
+
 
 
 cgat-showcase is a repository containing an example pipeline constructed to demonstrate how the [cgat-core](https://github.com/cgat-developers/cgat-core) workflow management system can be used to create common workflows required in bioinformatics analysis.
