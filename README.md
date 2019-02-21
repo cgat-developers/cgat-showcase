@@ -1,5 +1,5 @@
 
-![cgat-showcase](https://github.com/cgat-developers/cgat-showcase/docs/img/CGAT_showcase.png)
+![cgat-showcase](https://github.com/cgat-developers/cgat-showcase/blob/master/docs/img/CGAT_showcase.png)
 =======
 
 
