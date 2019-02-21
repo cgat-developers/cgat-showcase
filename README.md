@@ -22,3 +22,13 @@ Alternatively, the pipeline can be installed using pip::
    `pip install cgatshowcase`
 
 However, you will require certain software to run the pipeline. More detail on installation can be found on the [Installation](https://cgat-showcase.readthedocs.io/en/latest/getting_started/Installation.html) documentation.
+
+Installation issues
+-------------------
+
+Conda installation can be quite slow (particularly for linux) and this is primarily an issue 
+with the conda solver, which is known and developers are working on making it faster, so if installation
+is taking a long time then try to install using one of our conda-envs 
+(see conda-envs/environment-mac.yml or conda-envs/environment-linux.yml).
+
+	`conda env create -f [environment-mac.yml/environment-linux.yml]`

@@ -32,7 +32,7 @@ Installtion using conda environment
 
 The package distribution is quite large at the moment and as a consequence of problems with the conda solver it takes quite a long time to install the conda package.
 
-As a temporary work around we have included the conda environemnt used to run the cgatshowcase on the anaconda cloud. Please follow the instructions below#::
+As a temporary work around we have included the conda environemnt used to run the cgatshowcase on the anaconda cloud. Please follow the instructions below::
 
     conda env create cgat/cgatshowcase-env
 
@@ -43,6 +43,11 @@ You will then need to clone the cgatshowcase resository and run setup as follows
     cd cgat-showcase
     python setup.py develop
     cgatshowcase --help
+
+**Or** use one of our environment.yml files (see conda-envs/environment-mac.yml or conda-envs/environment-linux.yml). Then install a new
+environment by::
+
+    conda env create -f [environment-mac.yml/environment-linux.yml]
 
 
 Pip installation
