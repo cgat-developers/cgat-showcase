@@ -30,7 +30,7 @@ Installation issues
 -------------------
 
 Conda installation can be quite slow (particularly for linux) and this is primarily an issue 
-with the conda solver, which is known and developers are working on making it faster, so if installation
+with the conda solver, which is known and conda developers are working on making it faster, so if installation
 is taking a long time then try to install using one of our conda-envs 
 (see conda-envs/environment-mac.yml or conda-envs/environment-linux.yml).
 
